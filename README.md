@@ -1,1 +1,0 @@
-# auto-marketing-software
