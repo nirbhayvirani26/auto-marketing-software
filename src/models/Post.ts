@@ -6,6 +6,12 @@ import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
  */
 const PostSchema = new Schema(
   {
+    brand: {
+      type: Schema.Types.ObjectId,
+      ref: "Brand",
+      required: true,
+      index: true,
+    },
     campaign: { type: Schema.Types.ObjectId, ref: "Campaign", index: true },
     account: {
       type: Schema.Types.ObjectId,

@@ -1,20 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { AUTH_COOKIE, verifySession } from "@/lib/auth";
 
-const PUBLIC_PATHS = ["/login"];
+/** Login karela user aa pages par jay to andar moklo. */
+const AUTH_PAGES = ["/login", "/register", "/verify"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const token = request.cookies.get(AUTH_COOKIE)?.value;
-  const session = await verifySession(token);
+  const session = await verifySession(request.cookies.get(AUTH_COOKIE)?.value);
+  const home = session?.role === "superadmin" ? "/superadmin" : "/admin";
 
-  // Logged-in user login page par jay to admin ma moklo.
-  if (PUBLIC_PATHS.includes(pathname)) {
-    if (session) {
-      return NextResponse.redirect(new URL("/admin", request.url));
-    }
-    return NextResponse.next();
+  if (AUTH_PAGES.includes(pathname)) {
+    return session
+      ? NextResponse.redirect(new URL(home, request.url))
+      : NextResponse.next();
   }
 
   if (!session) {
@@ -23,11 +22,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Super admin panel fakt superadmin mate.
+  if (pathname.startsWith("/superadmin") && session.role !== "superadmin") {
+    return NextResponse.redirect(new URL("/admin", request.url));
+  }
+
+  // Superadmin no potano organization nathi, etle user panel ma na moklo.
+  if (pathname.startsWith("/admin") && session.role === "superadmin" && !session.org) {
+    return NextResponse.redirect(new URL("/superadmin", request.url));
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  // API routes potano auth check kare che (ane cron/webhook secret vaapre che),
-  // etle middleware fakt page routes par chale.
-  matcher: ["/admin/:path*", "/login"],
+  // Landing (/) ane pricing public che. API routes potano auth check kare che.
+  matcher: ["/admin/:path*", "/superadmin/:path*", "/login", "/register", "/verify"],
 };

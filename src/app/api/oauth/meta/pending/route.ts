@@ -1,20 +1,24 @@
 import { z } from "zod";
-import { handle, ok, requireAuth, fail } from "@/lib/api";
+import { handle, ok, requireBrand, fail } from "@/lib/api";
 import { PendingConnection } from "@/models/PendingConnection";
 import { SocialAccount } from "@/models/SocialAccount";
+import { subscribePageWebhooks } from "@/lib/social";
 import { logActivity } from "@/models/ActivityLog";
 
 export const dynamic = "force-dynamic";
 
 /** OAuth pachi malela accounts — token vagar (UI ne token ni jarur nathi). */
 export const GET = handle(async () => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
 
-  const pending = await PendingConnection.findOne({ user: auth.session.sub });
+  const pending = await PendingConnection.findOne({ user: ctx.session.sub });
   if (!pending) return ok({ accounts: [] });
 
-  const existing = await SocialAccount.find().select("pageId igUserId").lean();
+  // "alreadyConnected" aa brand ni andar j joyu jay che.
+  const existing = await SocialAccount.find({ brand: ctx.brandId })
+    .select("pageId igUserId")
+    .lean();
   const connectedKeys = new Set(
     existing.map((account) => account.igUserId || account.pageId),
   );
@@ -41,39 +45,57 @@ const confirmSchema = z.object({
  * Pehla thi hoy to token update thay che (re-connect kare tyare kaam lage).
  */
 export const POST = handle(async (request) => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
 
   const { indexes } = confirmSchema.parse(await request.json());
 
-  const pending = await PendingConnection.findOne({ user: auth.session.sub });
+  const pending = await PendingConnection.findOne({ user: ctx.session.sub });
   if (!pending) {
     return fail("Connection session puri thai gai — fari connect karo", 410);
   }
 
   const saved: string[] = [];
+  const webhookWarnings: string[] = [];
 
   for (const index of indexes) {
     const account = pending.accounts[index];
-    if (!account) continue;
+    if (!account?.accessToken) continue;
 
-    const key = account.igUserId
-      ? { platform: "instagram", igUserId: account.igUserId }
-      : { platform: "facebook", pageId: account.pageId };
+    // Account atyare na active brand ma jaay che.
+    const filter =
+      account.platform === "instagram"
+        ? { brand: ctx.brandId, igUserId: account.igUserId ?? "" }
+        : { brand: ctx.brandId, pageId: account.pageId ?? "" };
 
     await SocialAccount.findOneAndUpdate(
-      key,
+      filter,
       {
-        ...key,
+        ...filter,
+        platform: account.platform,
         displayName: account.displayName,
         accessToken: account.accessToken,
         avatarUrl: account.avatarUrl,
         status: "connected",
         lastError: undefined,
-        createdBy: auth.session.sub,
+        createdBy: ctx.session.sub,
       },
-      { upsert: true, new: true },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
     );
+
+    // Auto-DM chale e mate Meta ne kaho ke aa Page na comments moklo.
+    if (account.platform === "facebook" && account.pageId) {
+      try {
+        await subscribePageWebhooks({
+          pageId: account.pageId,
+          accessToken: account.accessToken,
+        });
+      } catch (error) {
+        webhookWarnings.push(
+          `${account.displayName}: ${(error as Error).message}`,
+        );
+      }
+    }
 
     saved.push(account.displayName ?? "");
   }
@@ -84,8 +106,13 @@ export const POST = handle(async (request) => {
     level: "success",
     action: "account.connected",
     message: `${saved.length} account connect thaya: ${saved.join(", ")}`,
-    actor: auth.session.email,
+    actor: ctx.session.email,
+    meta: { webhookWarnings },
   });
 
-  return ok({ connected: saved.length, accounts: saved });
+  return ok({
+    connected: saved.length,
+    accounts: saved,
+    webhookWarnings,
+  });
 });

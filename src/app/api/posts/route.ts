@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Post } from "@/models/Post";
 import { SocialAccount } from "@/models/SocialAccount";
-import { fail, handle, ok, requireAuth } from "@/lib/api";
+import { fail, handle, ok, requireBrand, requireLimit } from "@/lib/api";
+import { incrementPostUsage } from "@/lib/tenant";
 import { notifyN8n } from "@/lib/n8n";
 import { logActivity } from "@/models/ActivityLog";
 
@@ -26,8 +27,8 @@ const createSchema = z
   });
 
 export const GET = handle(async (request) => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
 
   const url = new URL(request.url);
   const status = url.searchParams.get("status");
@@ -35,7 +36,7 @@ export const GET = handle(async (request) => {
   const batchId = url.searchParams.get("batchId");
   const limit = Math.min(Number(url.searchParams.get("limit") ?? 100), 300);
 
-  const filter: Record<string, unknown> = {};
+  const filter: Record<string, unknown> = { brand: ctx.brandId };
   if (status) filter.status = status;
   if (platform) filter.platform = platform;
   if (batchId) filter.batchId = batchId;
@@ -59,8 +60,11 @@ export const GET = handle(async (request) => {
  * accounts atkata nathi — response ma per-account result pacho aave che.
  */
 export const POST = handle(async (request) => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
+
+  const limited = await requireLimit(ctx.tenant, "postsPerMonth");
+  if (limited) return limited;
 
   const body = createSchema.parse(await request.json());
 
@@ -68,7 +72,11 @@ export const POST = handle(async (request) => {
     new Set([...(body.accounts ?? []), ...(body.account ? [body.account] : [])]),
   );
 
-  const accounts = await SocialAccount.find({ _id: { $in: requestedIds } });
+  // brand filter — biji brand na account par post na thai jay.
+  const accounts = await SocialAccount.find({
+    _id: { $in: requestedIds },
+    brand: ctx.brandId,
+  });
   if (accounts.length === 0) {
     return fail("Ek pan valid social account madyu nahi", 404);
   }
@@ -91,6 +99,7 @@ export const POST = handle(async (request) => {
     }
 
     const post = await Post.create({
+      brand: ctx.brandId,
       account: account._id,
       campaign: body.campaign || undefined,
       platform: account.platform,
@@ -103,7 +112,7 @@ export const POST = handle(async (request) => {
       scheduledAt,
       batchId,
       source: body.generatedByAI ? "ai" : "manual",
-      createdBy: auth.session.sub,
+      createdBy: ctx.session.sub,
     });
 
     created.push({
@@ -120,13 +129,16 @@ export const POST = handle(async (request) => {
     );
   }
 
+  // Monthly quota — dareak banelo post ganay che.
+  await incrementPostUsage(ctx.orgId, created.length);
+
   await logActivity({
     level: skipped.length ? "warning" : "success",
     action: "post.created",
     message: `${created.length} post banya (${created
       .map((entry) => entry.account)
       .join(", ")})${skipped.length ? ` · ${skipped.length} skip thaya` : ""}`,
-    actor: auth.session.email,
+    actor: ctx.session.email,
     meta: { batchId, created, skipped },
   });
 

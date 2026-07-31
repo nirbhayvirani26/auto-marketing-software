@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Post } from "@/models/Post";
-import { fail, handle, ok, requireAuth } from "@/lib/api";
+import { fail, handle, ok, requireBrand } from "@/lib/api";
 
 const updateSchema = z.object({
   caption: z.string().min(1).optional(),
@@ -11,11 +11,11 @@ const updateSchema = z.object({
 });
 
 export const GET = handle(async (_request, { params }) => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
 
   const { id } = await params;
-  const post = await Post.findById(id)
+  const post = await Post.findOne({ _id: id, brand: ctx.brandId })
     .populate("account", "displayName platform")
     .populate("campaign", "name")
     .lean();
@@ -24,13 +24,13 @@ export const GET = handle(async (_request, { params }) => {
 });
 
 export const PATCH = handle(async (request, { params }) => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
 
   const { id } = await params;
   const body = updateSchema.parse(await request.json());
 
-  const post = await Post.findById(id);
+  const post = await Post.findOne({ _id: id, brand: ctx.brandId });
   if (!post) return fail("Post madyo nahi", 404);
   if (post.status === "published") {
     return fail("Publish thai gayela post ne edit na karay", 409);
@@ -52,11 +52,11 @@ export const PATCH = handle(async (request, { params }) => {
 });
 
 export const DELETE = handle(async (_request, { params }) => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
 
   const { id } = await params;
-  const post = await Post.findByIdAndDelete(id);
+  const post = await Post.findOneAndDelete({ _id: id, brand: ctx.brandId });
   if (!post) return fail("Post madyo nahi", 404);
   return ok({ deleted: true });
 });

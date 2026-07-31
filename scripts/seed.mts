@@ -1,18 +1,17 @@
 /**
- * Admin user seed script.
- *   npm run seed           -> fakt admin user banave
- *   npm run seed -- --demo -> saathe ek sample campaign + automation pan banave
+ * Platform seed.
+ *   npm run seed            -> plans + super admin + default organization
+ *   npm run seed -- --demo  -> saathe sample campaign + automation pan
  *
- * .env na SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD / SEED_ADMIN_NAME vaapre che.
- * User pehla thi hoy to password reset kari de che.
+ * Fari fari chalavi shakay — badhu upsert thay che.
  */
-import "node:process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 
-// Aa script Next.js runtime bahar chale che, etle .env jate load karvu pade.
+/* -------------------- env -------------------- */
+
 function loadEnvFile() {
   for (const name of [".env.local", ".env"]) {
     try {
@@ -32,101 +31,264 @@ function loadEnvFile() {
   }
 }
 
-async function main() {
-  loadEnvFile();
+/* -------------------- loose schemas --------------------
+ * Script Next.js bahar chale che etle ahiya halka schemas vaparyа che —
+ * `strict: false` thi app na models na badha fields pass thai jay che.
+ */
+const loose = (collection: string) =>
+  new mongoose.Schema({}, { strict: false, timestamps: true, collection });
 
-  const uri = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017/auto_marketing";
-  const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@example.com").toLowerCase();
-  const password = process.env.SEED_ADMIN_PASSWORD ?? "Admin@12345";
-  const name = process.env.SEED_ADMIN_NAME ?? "Super Admin";
-
-  console.log(`Connecting to ${uri} …`);
-  await mongoose.connect(uri, { serverSelectionTimeoutMS: 8000 });
-
-  const UserSchema = new mongoose.Schema(
-    {
-      name: String,
-      email: { type: String, unique: true },
-      passwordHash: String,
-      role: String,
-      active: Boolean,
-    },
-    { timestamps: true, collection: "users" },
-  );
-  const User = mongoose.models.User ?? mongoose.model("User", UserSchema);
-
-  const passwordHash = await bcrypt.hash(password, 12);
-  const existing = await User.findOne({ email });
-
-  if (existing) {
-    existing.set({ passwordHash, name, role: "admin", active: true });
-    await existing.save();
-    console.log(`✔ Existing admin update thayu: ${email}`);
-  } else {
-    await User.create({
-      name,
-      email,
-      passwordHash,
-      role: "admin",
-      active: true,
-    });
-    console.log(`✔ Admin user banyo: ${email}`);
-  }
-
-  console.log(`  Password: ${password}`);
-
-  if (process.argv.includes("--demo")) {
-    await seedDemoData();
-  }
-
-  console.log("  Have http://localhost:3000/login par login karo.");
-  await mongoose.disconnect();
+function model(name: string, collection: string) {
+  return mongoose.models[name] ?? mongoose.model(name, loose(collection));
 }
 
-/**
- * Sample campaign + automation — UI khali na lage etle. Koi real token nathi
- * etle aa demo data thi kai publish nahi thay; e safe che.
- */
-async function seedDemoData() {
-  const CampaignSchema = new mongoose.Schema(
-    {
-      name: String,
-      description: String,
-      brandVoice: String,
-      targetAudience: String,
-      keywords: [String],
-      hashtags: [String],
-      callToAction: String,
-      accounts: [mongoose.Schema.Types.ObjectId],
-      status: String,
+/* -------------------- plans -------------------- */
+
+const PLANS = [
+  {
+    key: "starter",
+    name: "Starter",
+    description: "Ek brand thi shuru karo",
+    priceMonthly: 999,
+    priceYearly: 9990,
+    sortOrder: 1,
+    limits: {
+      organizations: 1,
+      brands: 1,
+      socialAccounts: 3,
+      postsPerMonth: 100,
+      users: 1,
+      automations: 2,
+      commentRules: 0,
     },
-    { timestamps: true, collection: "campaigns" },
-  );
-  const AutomationSchema = new mongoose.Schema(
-    {
-      name: String,
-      campaign: mongoose.Schema.Types.ObjectId,
-      accounts: [mongoose.Schema.Types.ObjectId],
-      topic: String,
-      tone: String,
-      frequency: String,
-      timeOfDay: String,
-      dayOfWeek: Number,
-      autoPublish: Boolean,
-      enabled: Boolean,
-      runCount: Number,
+    modules: {
+      posts: true,
+      campaigns: true,
+      automations: true,
+      autoDm: false,
+      aiGeneration: true,
+      n8n: false,
+      apiTokens: false,
+      whiteLabel: false,
+      analytics: false,
     },
-    { timestamps: true, collection: "automations" },
+    highlights: [
+      "1 brand",
+      "3 social accounts",
+      "100 AI posts / month",
+      "Scheduling + auto publish",
+    ],
+  },
+  {
+    key: "pro",
+    name: "Pro",
+    description: "Vadhta business mate",
+    priceMonthly: 2999,
+    priceYearly: 29990,
+    popular: true,
+    sortOrder: 2,
+    limits: {
+      organizations: 1,
+      brands: 5,
+      socialAccounts: 20,
+      postsPerMonth: 1000,
+      users: 5,
+      automations: 20,
+      commentRules: 20,
+    },
+    modules: {
+      posts: true,
+      campaigns: true,
+      automations: true,
+      autoDm: true,
+      aiGeneration: true,
+      n8n: true,
+      apiTokens: false,
+      whiteLabel: false,
+      analytics: true,
+    },
+    highlights: [
+      "5 brands",
+      "20 social accounts",
+      "1000 AI posts / month",
+      "Auto DM & comment replies",
+      "n8n automation",
+      "5 team members",
+    ],
+  },
+  {
+    key: "agency",
+    name: "Agency",
+    description: "Ghani organizations chalavo — clients mate",
+    priceMonthly: 9999,
+    priceYearly: 99990,
+    sortOrder: 3,
+    limits: {
+      organizations: -1,
+      brands: -1,
+      socialAccounts: -1,
+      postsPerMonth: -1,
+      users: -1,
+      automations: -1,
+      commentRules: -1,
+    },
+    modules: {
+      posts: true,
+      campaigns: true,
+      automations: true,
+      autoDm: true,
+      aiGeneration: true,
+      n8n: true,
+      apiTokens: true,
+      whiteLabel: true,
+      analytics: true,
+    },
+    highlights: [
+      "Unlimited organizations",
+      "Unlimited brands & accounts",
+      "Unlimited AI posts",
+      "API tokens + n8n",
+      "White-label",
+      "Unlimited team members",
+    ],
+  },
+];
+
+async function seedPlans() {
+  const Plan = model("Plan", "plans");
+  for (const plan of PLANS) {
+    await Plan.findOneAndUpdate({ key: plan.key }, { ...plan, active: true, visible: true }, {
+      upsert: true,
+    });
+  }
+  console.log(`✔ ${PLANS.length} plans seed thaya`);
+}
+
+/* -------------------- users + org -------------------- */
+
+async function seedSuperAdmin() {
+  const User = model("User", "users");
+  const email = (process.env.SUPERADMIN_EMAIL ?? "superadmin@example.com").toLowerCase();
+  const password = process.env.SUPERADMIN_PASSWORD ?? "Super@12345";
+
+  await User.findOneAndUpdate(
+    { email },
+    {
+      name: process.env.SUPERADMIN_NAME ?? "Super Admin",
+      email,
+      passwordHash: await bcrypt.hash(password, 12),
+      role: "superadmin",
+      emailVerified: true,
+      active: true,
+      organization: null,
+    },
+    { upsert: true },
   );
 
-  const Campaign =
-    mongoose.models.Campaign ?? mongoose.model("Campaign", CampaignSchema);
-  const Automation =
-    mongoose.models.Automation ?? mongoose.model("Automation", AutomationSchema);
+  console.log(`✔ SUPER ADMIN : ${email} / ${password}`);
+  return email;
+}
+
+async function seedOrgOwner() {
+  const User = model("User", "users");
+  const Organization = model("Organization", "organizations");
+  const Plan = model("Plan", "plans");
+  const Brand = model("Brand", "brands");
+
+  const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@example.com").toLowerCase();
+  const password = process.env.SEED_ADMIN_PASSWORD ?? "Admin@12345";
+  const orgName = process.env.SEED_ORG_NAME ?? "My Company";
+
+  const plan =
+    (await Plan.findOne({ key: "agency" })) ?? (await Plan.findOne({}));
+
+  const user = await User.findOneAndUpdate(
+    { email },
+    {
+      name: process.env.SEED_ADMIN_NAME ?? "Org Owner",
+      email,
+      passwordHash: await bcrypt.hash(password, 12),
+      role: "owner",
+      emailVerified: true,
+      active: true,
+    },
+    { upsert: true, new: true },
+  );
+
+  let org = await Organization.findOne({ owner: user._id });
+  if (!org) {
+    org = await Organization.create({
+      name: orgName,
+      slug: orgName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+      owner: user._id,
+      plan: plan?._id,
+      status: "active",
+      usage: { postsThisMonth: 0, periodStart: new Date() },
+    });
+    console.log(`✔ Organization banyu: ${org.name} (${plan?.name} plan)`);
+  }
+
+  await User.updateOne(
+    { _id: user._id },
+    { organization: org._id, organizations: [org._id] },
+  );
+
+  // Brands ne organization saathe jodo (juna brands ne pan).
+  await Brand.updateMany(
+    { organization: { $exists: false } },
+    { $set: { organization: org._id } },
+  );
+
+  let brand = await Brand.findOne({ organization: org._id });
+  if (!brand) {
+    brand = await Brand.create({
+      organization: org._id,
+      name: orgName,
+      slug: "default",
+      brandVoice: "friendly, professional",
+      color: "#5B5BD6",
+      active: true,
+    });
+    console.log(`✔ Brand banyu: ${brand.name}`);
+  }
+
+  console.log(`✔ ORG OWNER   : ${email} / ${password}`);
+  return { orgId: org._id, brandId: brand._id };
+}
+
+/* -------------------- migration -------------------- */
+
+/** Juna records (brand field vagar na) ne default brand ma jodi de. */
+async function migrateLegacy(brandId: mongoose.Types.ObjectId) {
+  let migrated = 0;
+  for (const collection of [
+    "socialaccounts",
+    "campaigns",
+    "posts",
+    "automations",
+    "commentrules",
+  ]) {
+    const result = await mongoose.connection
+      .collection(collection)
+      .updateMany({ brand: { $exists: false } }, { $set: { brand: brandId } });
+    migrated += result.modifiedCount;
+  }
+  if (migrated > 0) console.log(`✔ ${migrated} juna records migrate thaya`);
+}
+
+/* -------------------- demo -------------------- */
+
+async function seedDemoData(
+  orgId: mongoose.Types.ObjectId,
+  brandId: mongoose.Types.ObjectId,
+) {
+  const Campaign = model("Campaign", "campaigns");
+  const Automation = model("Automation", "automations");
 
   const campaign = await Campaign.findOneAndUpdate(
-    { name: "Demo Campaign" },
+    { name: "Demo Campaign", brand: brandId },
     {
+      brand: brandId,
       name: "Demo Campaign",
       description: "Sample campaign — delete kari shako cho",
       brandVoice: "friendly, helpful, down to earth",
@@ -140,8 +302,9 @@ async function seedDemoData() {
   );
 
   await Automation.findOneAndUpdate(
-    { name: "Demo Daily Tip" },
+    { name: "Demo Daily Tip", brand: brandId },
     {
+      brand: brandId,
       name: "Demo Daily Tip",
       campaign: campaign._id,
       topic: "Ek practical marketing tip for small business owners",
@@ -153,10 +316,35 @@ async function seedDemoData() {
       enabled: false,
       runCount: 0,
     },
-    { upsert: true, new: true },
+    { upsert: true },
   );
 
   console.log("✔ Demo campaign ane automation banya (automation disabled che)");
+}
+
+/* -------------------- main -------------------- */
+
+async function main() {
+  loadEnvFile();
+
+  const uri =
+    process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017/auto_marketing";
+  console.log(`Connecting to ${uri} …\n`);
+  await mongoose.connect(uri, { serverSelectionTimeoutMS: 8000 });
+
+  await seedPlans();
+  await seedSuperAdmin();
+  const { orgId, brandId } = await seedOrgOwner();
+  await migrateLegacy(brandId);
+
+  if (process.argv.includes("--demo")) {
+    await seedDemoData(orgId, brandId);
+  }
+
+  console.log("\n  Login: http://localhost:3000/login");
+  console.log("  Super admin panel: http://localhost:3000/superadmin\n");
+
+  await mongoose.disconnect();
 }
 
 main().catch((error) => {

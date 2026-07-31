@@ -2,6 +2,12 @@ import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
 
 const CampaignSchema = new Schema(
   {
+    brand: {
+      type: Schema.Types.ObjectId,
+      ref: "Brand",
+      required: true,
+      index: true,
+    },
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     // AI ne aapva mate brand context

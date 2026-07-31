@@ -4,12 +4,29 @@ import { env } from "./env";
 
 export const AUTH_COOKIE = "am_session";
 
+export type UserRole = "superadmin" | "owner" | "admin" | "member";
+
 export type SessionPayload = {
   sub: string;
   email: string;
   name: string;
-  role: "admin" | "editor" | "viewer";
+  role: UserRole;
+  /** superadmin mate undefined — e koi organization ma nathi. */
+  org?: string;
 };
+
+export function isSuperAdmin(session: SessionPayload | null): boolean {
+  return session?.role === "superadmin";
+}
+
+/** Organization settings/billing badalvano hakk kone che. */
+export function canManageOrg(session: SessionPayload | null): boolean {
+  return (
+    session?.role === "superadmin" ||
+    session?.role === "owner" ||
+    session?.role === "admin"
+  );
+}
 
 function secretKey(): Uint8Array {
   return new TextEncoder().encode(env.jwtSecret);

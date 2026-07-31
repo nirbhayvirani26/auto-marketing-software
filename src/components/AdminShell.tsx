@@ -30,18 +30,23 @@ import ArticleIcon from "@mui/icons-material/ArticleOutlined";
 import CampaignIcon from "@mui/icons-material/CampaignOutlined";
 import BoltIcon from "@mui/icons-material/BoltOutlined";
 import HistoryIcon from "@mui/icons-material/HistoryOutlined";
+import StorefrontIcon from "@mui/icons-material/StorefrontOutlined";
+import ChatIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import { useColorMode } from "@/theme/ThemeRegistry";
+import BrandSwitcher from "./BrandSwitcher";
 
 const DRAWER_WIDTH = 248;
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: DashboardIcon, exact: true },
+  { href: "/admin/brands", label: "Brands", icon: StorefrontIcon },
   { href: "/admin/accounts", label: "Social Accounts", icon: GroupsIcon },
   { href: "/admin/campaigns", label: "Campaigns", icon: CampaignIcon },
   { href: "/admin/posts", label: "Posts", icon: ArticleIcon },
   { href: "/admin/automations", label: "Automations", icon: BoltIcon },
+  { href: "/admin/dm-rules", label: "Auto DM & Replies", icon: ChatIcon },
   { href: "/admin/logs", label: "Activity Logs", icon: HistoryIcon },
   { href: "/admin/settings", label: "Settings", icon: SettingsIcon },
 ];
@@ -161,6 +166,7 @@ export default function AdminShell({
           >
             <MenuIcon />
           </IconButton>
+          <BrandSwitcher />
           <Box sx={{ flex: 1 }} />
           <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
             <IconButton onClick={toggleMode}>

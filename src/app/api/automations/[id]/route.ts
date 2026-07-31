@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Automation } from "@/models/Automation";
 import { computeNextRun } from "@/lib/automation-runner";
-import { fail, handle, ok, requireAuth } from "@/lib/api";
+import { fail, handle, ok, requireBrand } from "@/lib/api";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -17,13 +17,13 @@ const updateSchema = z.object({
 });
 
 export const PATCH = handle(async (request, { params }) => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
 
   const { id } = await params;
   const body = updateSchema.parse(await request.json());
 
-  const automation = await Automation.findById(id);
+  const automation = await Automation.findOne({ _id: id, brand: ctx.brandId });
   if (!automation) return fail("Automation madyu nahi", 404);
 
   Object.assign(automation, {
@@ -48,11 +48,14 @@ export const PATCH = handle(async (request, { params }) => {
 });
 
 export const DELETE = handle(async (_request, { params }) => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
 
   const { id } = await params;
-  const automation = await Automation.findByIdAndDelete(id);
+  const automation = await Automation.findOneAndDelete({
+    _id: id,
+    brand: ctx.brandId,
+  });
   if (!automation) return fail("Automation madyu nahi", 404);
   return ok({ deleted: true });
 });

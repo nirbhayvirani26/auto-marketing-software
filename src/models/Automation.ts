@@ -8,6 +8,12 @@ import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
  */
 const AutomationSchema = new Schema(
   {
+    brand: {
+      type: Schema.Types.ObjectId,
+      ref: "Brand",
+      required: true,
+      index: true,
+    },
     name: { type: String, required: true, trim: true },
     campaign: { type: Schema.Types.ObjectId, ref: "Campaign", index: true },
     accounts: [{ type: Schema.Types.ObjectId, ref: "SocialAccount" }],

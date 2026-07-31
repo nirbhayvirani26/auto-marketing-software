@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { SocialAccount } from "@/models/SocialAccount";
-import { handle, ok, requireAuth } from "@/lib/api";
+import { handle, ok, requireBrand, requireLimit } from "@/lib/api";
 import { logActivity } from "@/models/ActivityLog";
 
 const createSchema = z
@@ -23,22 +23,28 @@ const createSchema = z
   );
 
 export const GET = handle(async () => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
 
-  const accounts = await SocialAccount.find().sort({ createdAt: -1 }).lean();
+  const accounts = await SocialAccount.find({ brand: ctx.brandId })
+    .sort({ createdAt: -1 })
+    .lean();
   return ok(accounts);
 });
 
 export const POST = handle(async (request) => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
+
+  const limited = await requireLimit(ctx.tenant, "socialAccounts");
+  if (limited) return limited;
 
   const body = createSchema.parse(await request.json());
   const account = await SocialAccount.create({
     ...body,
+    brand: ctx.brandId,
     avatarUrl: body.avatarUrl || undefined,
-    createdBy: auth.session.sub,
+    createdBy: ctx.session.sub,
     status: "connected",
   });
 
@@ -46,7 +52,7 @@ export const POST = handle(async (request) => {
     level: "success",
     action: "account.created",
     message: `${body.platform} account add thayu: ${body.displayName}`,
-    actor: auth.session.email,
+    actor: ctx.session.email,
   });
 
   return ok({ id: String(account._id) }, 201);

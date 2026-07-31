@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
@@ -41,10 +42,24 @@ function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
       const json = await response.json();
+
+      // Email verify baaki hoy to OTP screen par lai jao.
+      if (json?.extra?.needsVerification) {
+        const query = new URLSearchParams({ email: json.extra.email });
+        if (json.extra.devCode) query.set("dev", json.extra.devCode);
+        router.push(`/verify?${query.toString()}`);
+        return;
+      }
+
       if (!response.ok || !json.ok) {
         throw new Error(json.error ?? "Login fail thayu");
       }
-      router.replace(params.get("next") || "/admin");
+
+      // Super admin ne platform panel ma, baki na ne user panel ma.
+      const next =
+        params.get("next") ||
+        (json.data?.isSuperAdmin ? "/superadmin" : "/admin");
+      router.replace(next);
       router.refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -136,9 +151,11 @@ function LoginForm() {
           </Box>
 
           <Divider sx={{ my: 3 }} />
-          <Typography variant="caption" color="text.secondary">
-            Pehli var chalavo cho? Terminal ma <code>npm run seed</code> chalavo —
-            e .env na SEED_ADMIN_* mathi admin user banavse.
+          <Typography variant="body2" textAlign="center">
+            Account nathi?{" "}
+            <Link href="/register" style={{ color: "inherit" }}>
+              <strong>Free ma shuru karo</strong>
+            </Link>
           </Typography>
         </CardContent>
       </Card>

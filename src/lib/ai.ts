@@ -176,3 +176,89 @@ export async function generatePosts(
     imagePrompt: post.imagePrompt?.trim() ?? "",
   }));
 }
+
+/* ------------------------------------------------------------------ *
+ *  Comment par auto reply / DM
+ * ------------------------------------------------------------------ */
+
+const REPLY_SCHEMA = {
+  type: "object",
+  properties: {
+    publicReply: {
+      type: "string",
+      description:
+        "Short public reply to post under the comment. One or two sentences, no hashtags.",
+    },
+    dm: {
+      type: "string",
+      description:
+        "Direct message to send privately to the commenter. Friendly and specific, no hashtags.",
+    },
+  },
+  required: ["publicReply", "dm"],
+  additionalProperties: false,
+} as const;
+
+export async function generateCommentReply(input: {
+  comment: string;
+  username?: string;
+  platform: "facebook" | "instagram";
+  instruction?: string;
+  needsPublicReply: boolean;
+  needsDm: boolean;
+}): Promise<{ publicReply: string; dm: string }> {
+  const system = [
+    "You reply to comments on a brand's social media posts.",
+    "Write like a real person on the brand's social team — warm, brief, specific to what the commenter actually said.",
+    "Never invent prices, stock levels, delivery dates, or policies you were not told.",
+    "If the comment is hostile or a complaint, stay calm, do not argue, and offer to help privately.",
+    "No hashtags. No emoji spam. Do not repeat the commenter's words back verbatim.",
+  ].join(" ");
+
+  const userPrompt = [
+    `Platform: ${input.platform}`,
+    input.username ? `Commenter: ${input.username}` : "",
+    `Comment: "${input.comment}"`,
+    "",
+    input.instruction ? `Brand instruction: ${input.instruction}` : "",
+    "",
+    input.needsPublicReply
+      ? "Write a short public reply."
+      : "The public reply will not be used — return an empty string for it.",
+    input.needsDm
+      ? "Write a direct message to send this person privately."
+      : "The DM will not be used — return an empty string for it.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  let response;
+  try {
+    response = await getClient().messages.create({
+      model: env.anthropicModel,
+      max_tokens: 1000,
+      system,
+      output_config: {
+        format: { type: "json_schema", schema: REPLY_SCHEMA },
+      },
+      messages: [{ role: "user", content: userPrompt }],
+    });
+  } catch (error) {
+    throw friendlyAiError(error);
+  }
+
+  if (response.stop_reason === "refusal") {
+    throw new Error("AI e aa comment no jawab aapvani na paadi.");
+  }
+
+  const text = response.content.find((block) => block.type === "text");
+  if (!text || text.type !== "text") {
+    throw new Error("AI e koi reply na aapyu.");
+  }
+
+  const parsed = JSON.parse(text.text) as { publicReply: string; dm: string };
+  return {
+    publicReply: (parsed.publicReply ?? "").trim(),
+    dm: (parsed.dm ?? "").trim(),
+  };
+}

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Automation } from "@/models/Automation";
 import { computeNextRun } from "@/lib/automation-runner";
-import { handle, ok, requireAuth } from "@/lib/api";
+import { handle, ok, requireBrand } from "@/lib/api";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -20,10 +20,10 @@ const createSchema = z.object({
 });
 
 export const GET = handle(async () => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
 
-  const automations = await Automation.find()
+  const automations = await Automation.find({ brand: ctx.brandId })
     .populate("campaign", "name")
     .populate("accounts", "displayName platform")
     .sort({ createdAt: -1 })
@@ -32,15 +32,16 @@ export const GET = handle(async () => {
 });
 
 export const POST = handle(async (request) => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
 
   const body = createSchema.parse(await request.json());
   const automation = await Automation.create({
     ...body,
+    brand: ctx.brandId,
     campaign: body.campaign || undefined,
     nextRunAt: computeNextRun(body),
-    createdBy: auth.session.sub,
+    createdBy: ctx.session.sub,
   });
   return ok({ id: String(automation._id) }, 201);
 });

@@ -7,6 +7,12 @@ import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
  */
 const SocialAccountSchema = new Schema(
   {
+    brand: {
+      type: Schema.Types.ObjectId,
+      ref: "Brand",
+      required: true,
+      index: true,
+    },
     platform: {
       type: String,
       enum: ["facebook", "instagram"],
@@ -34,7 +40,16 @@ const SocialAccountSchema = new Schema(
   { timestamps: true },
 );
 
-SocialAccountSchema.index({ platform: 1, pageId: 1, igUserId: 1 });
+SocialAccountSchema.index({ brand: 1, platform: 1 });
+// Ek j Page/IG account ek brand ma be vaar na aavvu joiye.
+SocialAccountSchema.index(
+  { brand: 1, pageId: 1 },
+  { unique: true, partialFilterExpression: { pageId: { $type: "string" } } },
+);
+SocialAccountSchema.index(
+  { brand: 1, igUserId: 1 },
+  { unique: true, partialFilterExpression: { igUserId: { $type: "string" } } },
+);
 
 export type SocialAccountDoc = InferSchemaType<typeof SocialAccountSchema> & {
   _id: mongoose.Types.ObjectId;

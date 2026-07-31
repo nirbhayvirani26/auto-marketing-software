@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { generatePosts } from "@/lib/ai";
 import { Campaign } from "@/models/Campaign";
-import { handle, ok, requireAuth } from "@/lib/api";
+import { handle, ok, requireBrand, requireModule } from "@/lib/api";
 import { logActivity } from "@/models/ActivityLog";
 
 const schema = z.object({
@@ -13,14 +13,17 @@ const schema = z.object({
 });
 
 export const POST = handle(async (request) => {
-  const auth = await requireAuth();
-  if ("response" in auth) return auth.response;
+  const ctx = await requireBrand();
+  if ("response" in ctx) return ctx.response;
+
+  const gated = requireModule(ctx.tenant, "aiGeneration");
+  if (gated) return gated;
 
   const body = schema.parse(await request.json());
 
   // Campaign hoy to brand context AI ne aape.
   const campaign = body.campaignId
-    ? await Campaign.findById(body.campaignId).lean()
+    ? await Campaign.findOne({ _id: body.campaignId, brand: ctx.brandId }).lean()
     : null;
 
   const posts = await generatePosts({
@@ -37,7 +40,7 @@ export const POST = handle(async (request) => {
   await logActivity({
     action: "ai.generate",
     message: `${posts.length} ${body.platform} post generate thaya — "${body.topic}"`,
-    actor: auth.session.email,
+    actor: ctx.session.email,
   });
 
   return ok({ posts });

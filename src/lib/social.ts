@@ -122,6 +122,95 @@ export async function publishToInstagram(opts: {
   return { externalPostId: published.id, permalink };
 }
 
+/* ------------------------------------------------------------------ *
+ *  Comment reply + private DM
+ * ------------------------------------------------------------------ */
+
+/**
+ * Comment ni niche jaher ma jawab aape (Facebook ane Instagram — banne).
+ */
+export async function replyToComment(opts: {
+  commentId: string;
+  accessToken: string;
+  message: string;
+}): Promise<{ id: string }> {
+  return graphRequest<{ id: string }>(`/${opts.commentId}/replies`, {
+    message: opts.message,
+    access_token: opts.accessToken,
+  });
+}
+
+/**
+ * Facebook: comment karnar ne Messenger ma private reply mokle.
+ *
+ * ⚠️ Meta ni limit — ek comment dith fakt EK private reply, ane comment
+ * thaya na 7 divas ni andar. Bija prayatne API error aape che.
+ */
+export async function sendFacebookPrivateReply(opts: {
+  commentId: string;
+  accessToken: string;
+  message: string;
+}): Promise<{ id: string }> {
+  return graphRequest<{ id: string }>(`/${opts.commentId}/private_replies`, {
+    message: opts.message,
+    access_token: opts.accessToken,
+  });
+}
+
+/**
+ * Instagram: comment karnar ne DM mokle.
+ *
+ * IG ma alag endpoint che — Page na IG-scoped messages endpoint par
+ * `recipient: { comment_id }` mokalvu pade che.
+ * `instagram_manage_messages` permission joiye che.
+ */
+export async function sendInstagramPrivateReply(opts: {
+  igUserId: string;
+  accessToken: string;
+  commentId: string;
+  message: string;
+}): Promise<{ message_id?: string }> {
+  const url = new URL(`${GRAPH()}/${opts.igUserId}/messages`);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      recipient: { comment_id: opts.commentId },
+      message: { text: opts.message },
+      access_token: opts.accessToken,
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  const json = (await response.json()) as {
+    message_id?: string;
+    error?: { message: string };
+  };
+  if (!response.ok || json.error) {
+    throw new Error(
+      `Instagram DM: ${json.error?.message ?? response.status}`,
+    );
+  }
+  return json;
+}
+
+/**
+ * Meta ne kaho ke aa Page na comments/messages na updates aapna webhook par
+ * moklo. Aa ek j vaar karvanu hoy che (account connect thay tyare).
+ */
+export async function subscribePageWebhooks(opts: {
+  pageId: string;
+  accessToken: string;
+}): Promise<{ success: boolean }> {
+  return graphRequest<{ success: boolean }>(
+    `/${opts.pageId}/subscribed_apps`,
+    {
+      subscribed_fields: "feed,mention,messages,messaging_postbacks",
+      access_token: opts.accessToken,
+    },
+  );
+}
+
 /** Caption + hashtags ne ek publishable string ma jode. */
 export function composeCaption(caption: string, hashtags: string[]): string {
   if (!hashtags.length) return caption;

@@ -106,6 +106,7 @@ export async function runAutomation(
       );
 
       const post = await Post.create({
+        brand: automation.brand,
         campaign: campaign?._id,
         account: account._id,
         platform: account.platform,
