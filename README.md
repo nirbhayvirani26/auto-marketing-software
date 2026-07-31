@@ -156,14 +156,39 @@ auto-marketing-software/
 
 ## 4. Meta (Facebook + Instagram) setup
 
-1. <https://developers.facebook.com/apps> par app banavo.
-2. Products add karo: **Facebook Login** + **Instagram Graph API**.
-3. Permissions: `pages_manage_posts`, `pages_read_engagement`,
-   `instagram_basic`, `instagram_content_publish`.
-4. Graph API Explorer ma:
-   - `GET /me/accounts` → **Page ID** ane **Page access token**
-   - `GET /{page-id}?fields=instagram_business_account` → **IG User ID**
-5. Admin panel → **Social Accounts** → *Account add karo* ma e value nakho.
+### Option A — "Connect with Facebook" (recommended)
+
+Ek j click ma tamara badha Pages ane tema jodayela Instagram Business accounts
+aavi jashe — Page ID ke token hathe nakhva nahi pade.
+
+1. <https://developers.facebook.com/apps> par app banavo (type: **Business**).
+2. **Facebook Login** product add karo.
+3. Facebook Login → Settings → **Valid OAuth Redirect URIs** ma aa *exact* URL nakho:
+   ```
+   http://localhost:3000/api/oauth/meta/callback
+   ```
+4. Settings → Basic mathi **App ID** ane **App Secret** lai `.env` ma nakho:
+   ```
+   META_APP_ID=...
+   META_APP_SECRET=...
+   ```
+5. Dev server restart karo → Admin → **Social Accounts** →
+   **Connect with Facebook** dabavo → Facebook par permission aapo →
+   pacha aavo tyare "kaya accounts connect karva" nu picker khulse.
+
+App je permissions mange che: `pages_show_list`, `pages_manage_posts`,
+`pages_read_engagement`, `business_management`, `instagram_basic`,
+`instagram_content_publish`.
+
+> App **Development mode** ma hoy tyare fakt app na admin / developer / tester
+> role vada log j login kari shake. Baki na users mate App Review joiye.
+
+### Option B — Manual (Meta app vagar)
+
+Accounts page → **Manual** button. Graph API Explorer mathi:
+
+- `GET /me/accounts` → **Page ID** ane **Page access token**
+- `GET /{page-id}?fields=instagram_business_account` → **IG User ID**
 
 > ⚠️ Instagram Content Publishing API ne **public https image URL** joiye j
 > che. `localhost` path nahi chale — Cloudinary / S3 / imgur jeva host par
@@ -233,10 +258,13 @@ App `N8N_WEBHOOK_URL` par POST kare che:
 |---|---|---|
 | POST | `/api/auth/login` | Login (JWT cookie set kare) |
 | POST | `/api/auth/logout` | Logout |
-| GET/POST | `/api/accounts` | Social accounts list / add |
+| GET/POST | `/api/accounts` | Social accounts list / manual add |
 | PATCH/DELETE | `/api/accounts/[id]` | Update / delete |
+| GET | `/api/oauth/meta/start` | Facebook OAuth shuru karo |
+| GET | `/api/oauth/meta/callback` | Facebook pacho ahiya mokle |
+| GET/POST | `/api/oauth/meta/pending` | Malela accounts jovo / connect karo |
 | GET/POST | `/api/campaigns` | Campaigns |
-| GET/POST | `/api/posts` | Posts (`?status=`, `?platform=`) |
+| GET/POST | `/api/posts` | Posts (`?status=`, `?platform=`, `?batchId=`) — POST ma `accounts[]` aapo to badha par ek saathe |
 | PATCH/DELETE | `/api/posts/[id]` | Edit / delete draft |
 | POST | `/api/posts/[id]/publish` | Have j publish karo |
 | POST | `/api/ai/generate` | Claude thi caption + hashtags |
@@ -250,6 +278,38 @@ App `N8N_WEBHOOK_URL` par POST kare che:
 
 Badha response no shape: `{ "ok": true, "data": … }` athva
 `{ "ok": false, "error": "…" }`.
+
+### Ek saathe ghana accounts par post
+
+```jsonc
+POST /api/posts
+{
+  "accounts": ["<fb-id>", "<ig-id>", "<fb-id-2>"],
+  "caption": "Diwali offer — 30% off!",
+  "hashtags": ["diwali", "sale"],
+  "mediaUrl": "https://example.com/banner.jpg",
+  "status": "scheduled",
+  "scheduledAt": "2026-08-05T09:30:00.000Z"
+}
+```
+
+Dareak account mate alag Post document bane che (potano status ane permalink),
+pan badha ek `batchId` thi jodayela rahe che. Ek account fail thay to biju
+atkatu nathi — response ma per-account result pacho aave che:
+
+```jsonc
+{
+  "ok": true,
+  "data": {
+    "batchId": "5f1c…",
+    "created": [ { "id": "…", "account": "My Page", "platform": "facebook" } ],
+    "skipped": [ { "account": "@mybrand", "reason": "Instagram mate public image URL farjiyat che" } ]
+  }
+}
+```
+
+UI ma multi-account post ne **multi-account** chip lagelo hoy che, ane
+**Batch** button thi tena badha pending posts ek saathe publish thai jay che.
 
 ---
 

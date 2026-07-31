@@ -3,17 +3,25 @@
 import * as React from "react";
 import {
   Alert,
+  AlertTitle,
   Box,
   Button,
   Card,
+  Checkbox,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
+  FormControl,
   IconButton,
+  InputLabel,
+  ListItemText,
   MenuItem,
+  OutlinedInput,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -32,11 +40,14 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import SendIcon from "@mui/icons-material/SendOutlined";
 import DeleteIcon from "@mui/icons-material/DeleteOutline";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import FacebookIcon from "@mui/icons-material/Facebook";
+import InstagramIcon from "@mui/icons-material/Instagram";
 import PageHeader from "@/components/PageHeader";
 import StatusChip from "@/components/StatusChip";
 import { apiFetch } from "@/lib/client";
 
-type Account = { _id: string; displayName: string; platform: "facebook" | "instagram" };
+type Platform = "facebook" | "instagram";
+type Account = { _id: string; displayName: string; platform: Platform };
 type Campaign = { _id: string; name: string };
 type Post = {
   _id: string;
@@ -49,13 +60,31 @@ type Post = {
   publishedAt?: string;
   permalink?: string;
   error?: string;
+  batchId?: string;
   account?: { displayName: string };
   createdAt: string;
 };
 
 type Generated = { caption: string; hashtags: string[]; imagePrompt: string };
+type BulkResult = {
+  batchId?: string;
+  created: Array<{ id: string; account: string; platform: string }>;
+  skipped: Array<{ account: string; reason: string }>;
+};
 
 const STATUS_TABS = ["all", "draft", "scheduled", "published", "failed"] as const;
+
+const EMPTY_FORM = {
+  accounts: [] as string[],
+  campaign: "",
+  topic: "",
+  tone: "friendly",
+  aiPlatform: "facebook" as Platform,
+  caption: "",
+  hashtags: "",
+  mediaUrl: "",
+  scheduledAt: "",
+};
 
 export default function PostsPage() {
   const [posts, setPosts] = React.useState<Post[]>([]);
@@ -63,20 +92,11 @@ export default function PostsPage() {
   const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
   const [tab, setTab] = React.useState<(typeof STATUS_TABS)[number]>("all");
   const [error, setError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<React.ReactNode>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
 
   const [open, setOpen] = React.useState(false);
-  const [form, setForm] = React.useState({
-    account: "",
-    campaign: "",
-    topic: "",
-    tone: "friendly",
-    caption: "",
-    hashtags: "",
-    mediaUrl: "",
-    scheduledAt: "",
-  });
+  const [form, setForm] = React.useState(EMPTY_FORM);
   const [generating, setGenerating] = React.useState(false);
   const [variants, setVariants] = React.useState<Generated[]>([]);
   const [saving, setSaving] = React.useState(false);
@@ -97,13 +117,25 @@ export default function PostsPage() {
 
   React.useEffect(load, [load]);
 
-  const selectedAccount = accounts.find((a) => a._id === form.account);
+  const selected = accounts.filter((a) => form.accounts.includes(a._id));
+  const hasInstagram = selected.some((a) => a.platform === "instagram");
+  const igNeedsImage = hasInstagram && !form.mediaUrl;
+
+  /** Account select thay tyare AI platform aapoaap set thay. */
+  function handleAccountsChange(ids: string[]) {
+    const picked = accounts.filter((a) => ids.includes(a._id));
+    const platforms = new Set(picked.map((a) => a.platform));
+    setForm((f) => ({
+      ...f,
+      accounts: ids,
+      aiPlatform:
+        platforms.size === 1
+          ? (platforms.values().next().value as Platform)
+          : f.aiPlatform,
+    }));
+  }
 
   async function handleGenerate() {
-    if (!selectedAccount) {
-      setError("Pehla account select karo");
-      return;
-    }
     setGenerating(true);
     setError(null);
     try {
@@ -111,14 +143,13 @@ export default function PostsPage() {
         method: "POST",
         json: {
           topic: form.topic,
-          platform: selectedAccount.platform,
+          platform: form.aiPlatform,
           tone: form.tone,
           campaignId: form.campaign || undefined,
           variants: 3,
         },
       });
       setVariants(result.posts);
-      // Pehlo variant sidho form ma bhari do.
       const first = result.posts[0];
       if (first) {
         setForm((f) => ({
@@ -138,10 +169,10 @@ export default function PostsPage() {
     setSaving(true);
     setError(null);
     try {
-      await apiFetch("/api/posts", {
+      const result = await apiFetch<BulkResult>("/api/posts", {
         method: "POST",
         json: {
-          account: form.account,
+          accounts: form.accounts,
           campaign: form.campaign || undefined,
           caption: form.caption,
           hashtags: form.hashtags
@@ -158,19 +189,27 @@ export default function PostsPage() {
           generatedByAI: variants.length > 0,
         },
       });
+
       setOpen(false);
       setVariants([]);
-      setForm({
-        account: "",
-        campaign: "",
-        topic: "",
-        tone: "friendly",
-        caption: "",
-        hashtags: "",
-        mediaUrl: "",
-        scheduledAt: "",
-      });
-      setNotice(status === "scheduled" ? "Post schedule thai gayo" : "Draft save thayo");
+      setForm(EMPTY_FORM);
+      setNotice(
+        <>
+          <AlertTitle>
+            {result.created.length} account par{" "}
+            {status === "scheduled" ? "schedule thayu" : "draft banyu"}
+          </AlertTitle>
+          {result.created.map((entry) => entry.account).join(", ")}
+          {result.skipped.length > 0 && (
+            <Box sx={{ mt: 1 }}>
+              <strong>Skip thaya:</strong>{" "}
+              {result.skipped
+                .map((entry) => `${entry.account} (${entry.reason})`)
+                .join(", ")}
+            </Box>
+          )}
+        </>,
+      );
       load();
     } catch (e) {
       setError((e as Error).message);
@@ -193,6 +232,37 @@ export default function PostsPage() {
     }
   }
 
+  /** Ek batch na badha pending posts ne ek saathe publish kare. */
+  async function handlePublishBatch(batchId: string) {
+    setBusy(batchId);
+    setError(null);
+    try {
+      const batch = await apiFetch<Post[]>(`/api/posts?batchId=${batchId}`);
+      const pending = batch.filter((p) => p.status !== "published");
+      const results = await Promise.allSettled(
+        pending.map((p) =>
+          apiFetch(`/api/posts/${p._id}/publish`, { method: "POST" }),
+        ),
+      );
+      const okCount = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.filter((r) => r.status === "rejected").length;
+      setNotice(`${okCount} publish thaya${failed ? `, ${failed} fail` : ""}`);
+      if (failed) {
+        setError(
+          results
+            .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+            .map((r) => (r.reason as Error).message)
+            .join(" | "),
+        );
+      }
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handleDelete(id: string) {
     if (!confirm("Aa post delete karvo che?")) return;
     try {
@@ -207,7 +277,7 @@ export default function PostsPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Posts"
-        subtitle="AI thi caption banavo, schedule karo ke sidhu publish karo"
+        subtitle="Ek caption, ghana accounts — AI thi banavo ane ek saathe publish karo"
         action={
           <Button
             variant="contained"
@@ -241,7 +311,7 @@ export default function PostsPage() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ width: "45%" }}>Caption</TableCell>
+                <TableCell sx={{ width: "42%" }}>Caption</TableCell>
                 <TableCell>Account</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Schedule</TableCell>
@@ -265,19 +335,31 @@ export default function PostsPage() {
                       {post.caption.slice(0, 160)}
                       {post.caption.length > 160 ? "…" : ""}
                     </Typography>
+                    {post.batchId && (
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label="multi-account"
+                        sx={{ mt: 0.5, height: 20, fontSize: 11 }}
+                      />
+                    )}
                     {post.error && (
-                      <Typography variant="caption" color="error">
+                      <Typography variant="caption" color="error" display="block">
                         {post.error}
                       </Typography>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">
-                      {post.account?.displayName ?? "—"}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {post.platform}
-                    </Typography>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      {post.platform === "facebook" ? (
+                        <FacebookIcon fontSize="small" color="action" />
+                      ) : (
+                        <InstagramIcon fontSize="small" color="action" />
+                      )}
+                      <Typography variant="body2">
+                        {post.account?.displayName ?? "—"}
+                      </Typography>
+                    </Stack>
                   </TableCell>
                   <TableCell>
                     <StatusChip status={post.status} />
@@ -304,6 +386,23 @@ export default function PostsPage() {
                           >
                             <OpenInNewIcon fontSize="small" />
                           </IconButton>
+                        </Tooltip>
+                      )}
+                      {post.batchId && post.status !== "published" && (
+                        <Tooltip title="Aa batch na badha accounts par publish karo">
+                          <span>
+                            <Button
+                              size="small"
+                              disabled={busy === post.batchId}
+                              onClick={() => handlePublishBatch(post.batchId!)}
+                            >
+                              {busy === post.batchId ? (
+                                <CircularProgress size={14} />
+                              ) : (
+                                "Batch"
+                              )}
+                            </Button>
+                          </span>
                         </Tooltip>
                       )}
                       {post.status !== "published" && (
@@ -339,38 +438,87 @@ export default function PostsPage() {
       </Card>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>Navo post banavo</DialogTitle>
+        <DialogTitle>Navo post — ek ke ghana accounts par</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                select
-                label="Account"
-                value={form.account}
-                onChange={(e) => setForm({ ...form, account: e.target.value })}
-                fullWidth
+            <FormControl fullWidth>
+              <InputLabel id="accounts-label">Accounts (ghana select karo)</InputLabel>
+              <Select
+                labelId="accounts-label"
+                multiple
+                value={form.accounts}
+                onChange={(e) =>
+                  handleAccountsChange(
+                    typeof e.target.value === "string"
+                      ? e.target.value.split(",")
+                      : e.target.value,
+                  )
+                }
+                input={<OutlinedInput label="Accounts (ghana select karo)" />}
+                renderValue={(ids) => (
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                    {accounts
+                      .filter((a) => ids.includes(a._id))
+                      .map((a) => (
+                        <Chip
+                          key={a._id}
+                          size="small"
+                          label={a.displayName}
+                          icon={
+                            a.platform === "facebook" ? (
+                              <FacebookIcon />
+                            ) : (
+                              <InstagramIcon />
+                            )
+                          }
+                        />
+                      ))}
+                  </Stack>
+                )}
               >
+                {accounts.length === 0 && (
+                  <MenuItem disabled>
+                    Pehla Accounts page ma account connect karo
+                  </MenuItem>
+                )}
                 {accounts.map((account) => (
                   <MenuItem key={account._id} value={account._id}>
-                    {account.displayName} ({account.platform})
+                    <Checkbox checked={form.accounts.includes(account._id)} />
+                    {account.platform === "facebook" ? (
+                      <FacebookIcon fontSize="small" sx={{ mr: 1 }} />
+                    ) : (
+                      <InstagramIcon fontSize="small" sx={{ mr: 1 }} />
+                    )}
+                    <ListItemText
+                      primary={account.displayName}
+                      secondary={account.platform}
+                    />
                   </MenuItem>
                 ))}
-              </TextField>
-              <TextField
-                select
-                label="Campaign (optional)"
-                value={form.campaign}
-                onChange={(e) => setForm({ ...form, campaign: e.target.value })}
-                fullWidth
-              >
-                <MenuItem value="">— koi nahi —</MenuItem>
-                {campaigns.map((campaign) => (
-                  <MenuItem key={campaign._id} value={campaign._id}>
-                    {campaign.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Stack>
+              </Select>
+            </FormControl>
+
+            <TextField
+              select
+              label="Campaign (optional)"
+              value={form.campaign}
+              onChange={(e) => setForm({ ...form, campaign: e.target.value })}
+              fullWidth
+            >
+              <MenuItem value="">— koi nahi —</MenuItem>
+              {campaigns.map((campaign) => (
+                <MenuItem key={campaign._id} value={campaign._id}>
+                  {campaign.name}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {igNeedsImage && (
+              <Alert severity="warning">
+                Instagram account select karyu che — niche <strong>Image URL</strong>{" "}
+                nakho, nahi to fakt Facebook accounts par j post jashe.
+              </Alert>
+            )}
 
             <Divider>AI thi generate karo</Divider>
 
@@ -383,10 +531,23 @@ export default function PostsPage() {
                 fullWidth
               />
               <TextField
+                select
+                label="Optimize for"
+                value={form.aiPlatform}
+                onChange={(e) =>
+                  setForm({ ...form, aiPlatform: e.target.value as Platform })
+                }
+                sx={{ minWidth: 150 }}
+                helperText="Caption style"
+              >
+                <MenuItem value="facebook">Facebook</MenuItem>
+                <MenuItem value="instagram">Instagram</MenuItem>
+              </TextField>
+              <TextField
                 label="Tone"
                 value={form.tone}
                 onChange={(e) => setForm({ ...form, tone: e.target.value })}
-                sx={{ minWidth: 160 }}
+                sx={{ minWidth: 140 }}
               />
               <Button
                 variant="outlined"
@@ -394,8 +555,8 @@ export default function PostsPage() {
                   generating ? <CircularProgress size={16} /> : <AutoAwesomeIcon />
                 }
                 onClick={handleGenerate}
-                disabled={generating || !form.topic || !form.account}
-                sx={{ minWidth: 150 }}
+                disabled={generating || !form.topic}
+                sx={{ minWidth: 140, height: 40 }}
               >
                 Generate
               </Button>
@@ -458,8 +619,8 @@ export default function PostsPage() {
               value={form.mediaUrl}
               onChange={(e) => setForm({ ...form, mediaUrl: e.target.value })}
               helperText={
-                selectedAccount?.platform === "instagram"
-                  ? "Instagram mate farjiyat — public https URL hovu joiye (localhost nahi chale)"
+                hasInstagram
+                  ? "Instagram mate farjiyat — public https URL (localhost nahi chale)"
                   : "Optional — image saathe post karva mate"
               }
               fullWidth
@@ -480,16 +641,21 @@ export default function PostsPage() {
           <Box sx={{ flex: 1 }} />
           <Button
             onClick={() => handleSave("draft")}
-            disabled={saving || !form.caption || !form.account}
+            disabled={saving || !form.caption || form.accounts.length === 0}
           >
-            Draft save karo
+            Draft save karo ({form.accounts.length})
           </Button>
           <Button
             variant="contained"
             onClick={() => handleSave("scheduled")}
-            disabled={saving || !form.caption || !form.account || !form.scheduledAt}
+            disabled={
+              saving ||
+              !form.caption ||
+              form.accounts.length === 0 ||
+              !form.scheduledAt
+            }
           >
-            Schedule karo
+            Schedule karo ({form.accounts.length})
           </Button>
         </DialogActions>
       </Dialog>

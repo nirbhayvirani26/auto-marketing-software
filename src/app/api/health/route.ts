@@ -24,10 +24,16 @@ export const GET = handle(async () => {
       label: "Anthropic API key (AI content generation)",
       hint: ".env ma ANTHROPIC_API_KEY nakho",
     },
+    metaOAuth: {
+      ok: Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET),
+      label: "Meta app (Connect with Facebook button)",
+      hint: ".env ma META_APP_ID ane META_APP_SECRET nakho",
+      optional: true,
+    },
     publishing: {
       ok: accountsWithToken > 0,
       label: "Social account access token",
-      hint: "Accounts page ma Page access token saathe account add karo",
+      hint: "Accounts page ma account connect karo",
     },
     cron: {
       ok: Boolean(process.env.CRON_SECRET),

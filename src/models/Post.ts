@@ -48,6 +48,12 @@ const PostSchema = new Schema(
       enum: ["manual", "ai", "automation", "n8n"],
       default: "manual",
     },
+    /**
+     * Ek j vaar ma ghana account par post karo tyare badha posts ne aa id thi
+     * group karay che. Dareak post no potano status/permalink rahe che, etle
+     * ek account fail thay to biju atkatu nathi.
+     */
+    batchId: { type: String, trim: true, index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true },
