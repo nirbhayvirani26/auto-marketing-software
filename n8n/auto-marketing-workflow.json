@@ -1,0 +1,237 @@
+{
+  "name": "Auto Marketing — Scheduler & Events",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 1 }]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-380, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://host.docker.internal:3000/api/cron/dispatch",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-cron-secret",
+              "value": "={{ $env.CRON_SECRET }}"
+            }
+          ]
+        },
+        "options": { "timeout": 60000 }
+      },
+      "id": "cron-dispatch",
+      "name": "Dispatch Due Work",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-140, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.postsProcessed + $json.data.automationsProcessed }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "had-work",
+      "name": "Kai Kaam Thayu?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [100, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "summary",
+              "name": "summary",
+              "type": "string",
+              "value": "={{ $json.data.postsProcessed }} post ane {{ $json.data.automationsProcessed }} automation process thaya"
+            }
+          ]
+        }
+      },
+      "id": "summarise",
+      "name": "Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [340, -100]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "auto-marketing",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "inbound-webhook",
+      "name": "App Events Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-380, 280],
+      "webhookId": "auto-marketing-events"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "version": 2 },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.event }}",
+                    "rightValue": "post.published",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "published"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "version": 2 },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.event }}",
+                    "rightValue": "post.failed",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "failed"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "route-event",
+      "name": "Event Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [-140, 280]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "msg",
+              "name": "message",
+              "type": "string",
+              "value": "=✅ Publish thayu: {{ $json.body.payload.platform }} → {{ $json.body.payload.permalink }}"
+            }
+          ]
+        }
+      },
+      "id": "on-published",
+      "name": "Publish Thayu",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [140, 180]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "msg",
+              "name": "message",
+              "type": "string",
+              "value": "=❌ Publish fail: {{ $json.body.payload.error }}"
+            }
+          ]
+        }
+      },
+      "id": "on-failed",
+      "name": "Publish Fail",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [140, 320]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "msg",
+              "name": "message",
+              "type": "string",
+              "value": "=ℹ️ Event: {{ $json.body.event }}"
+            }
+          ]
+        }
+      },
+      "id": "on-other",
+      "name": "Biju Event",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [140, 460]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"ok\": true, \"message\": $json.message } }}"
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [420, 320]
+    }
+  ],
+  "connections": {
+    "Every Minute": {
+      "main": [[{ "node": "Dispatch Due Work", "type": "main", "index": 0 }]]
+    },
+    "Dispatch Due Work": {
+      "main": [[{ "node": "Kai Kaam Thayu?", "type": "main", "index": 0 }]]
+    },
+    "Kai Kaam Thayu?": {
+      "main": [[{ "node": "Summary", "type": "main", "index": 0 }], []]
+    },
+    "App Events Webhook": {
+      "main": [[{ "node": "Event Router", "type": "main", "index": 0 }]]
+    },
+    "Event Router": {
+      "main": [
+        [{ "node": "Publish Thayu", "type": "main", "index": 0 }],
+        [{ "node": "Publish Fail", "type": "main", "index": 0 }],
+        [{ "node": "Biju Event", "type": "main", "index": 0 }]
+      ]
+    },
+    "Publish Thayu": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    },
+    "Publish Fail": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    },
+    "Biju Event": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": {
+    "instanceId": "auto-marketing-software"
+  },
+  "tags": []
+}
