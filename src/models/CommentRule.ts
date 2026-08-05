@@ -46,6 +46,12 @@ const CommentRuleSchema = new Schema(
     dmLinkTitle: { type: String, trim: true },
 
     /**
+     * Product jodyu hoy to DM ma ENI link jaay che — `dmLinkUrl` ne badle.
+     * Aa thi "comment karo to product ni link DM ma malshe" flow bane che.
+     */
+    product: { type: Schema.Types.ObjectId, ref: "Product" },
+
+    /**
      * true hoy to reply AI thi banashe (comment no context aapine),
      * fixed text ne badle.
      */

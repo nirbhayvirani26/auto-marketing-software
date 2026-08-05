@@ -1,56 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { env } from "./env";
+import { complete } from "./ai/index";
 
-let client: Anthropic | null = null;
+export { AiError, allProviders, providerStatus, ollamaPing } from "./ai/index";
+export type { AiProvider, ProviderKey } from "./ai/index";
 
-function getClient(): Anthropic {
-  if (!client) {
-    client = new Anthropic({ apiKey: env.anthropicApiKey });
-  }
-  return client;
-}
-
-/**
- * Anthropic SDK na error ne samajay evi bhasha ma badle che — nahi to UI ma
- * raw JSON blob dekhaay che.
- */
-function friendlyAiError(error: unknown): Error {
-  if (error instanceof Anthropic.APIError) {
-    const message = String(
-      (error.error as { error?: { message?: string } })?.error?.message ??
-        error.message,
-    );
-
-    if (/credit balance is too low/i.test(message)) {
-      return new Error(
-        "Anthropic account ma credit khutya che. console.anthropic.com → Plans & Billing par credit add karo.",
-      );
-    }
-    if (error instanceof Anthropic.AuthenticationError) {
-      return new Error(
-        "ANTHROPIC_API_KEY khoto ke expire thayelo che. .env ma navo key nakho ane server restart karo.",
-      );
-    }
-    if (error instanceof Anthropic.RateLimitError) {
-      return new Error(
-        "Anthropic rate limit lagi gayu. Thodi var pachi fari try karo.",
-      );
-    }
-    if (error instanceof Anthropic.NotFoundError) {
-      return new Error(
-        `Model "${env.anthropicModel}" madyu nahi. .env ma ANTHROPIC_MODEL check karo.`,
-      );
-    }
-    if (error.status && error.status >= 500) {
-      return new Error(
-        "Anthropic API atyare available nathi. Thodi var pachi try karo.",
-      );
-    }
-    return new Error(`Anthropic API: ${message}`);
-  }
-
-  return error instanceof Error ? error : new Error(String(error));
-}
+/* ------------------------------------------------------------------ *
+ *  Social post generation
+ * ------------------------------------------------------------------ */
 
 export type GenerateInput = {
   topic: string;
@@ -60,8 +15,16 @@ export type GenerateInput = {
   targetAudience?: string;
   keywords?: string[];
   callToAction?: string;
-  /** Ketla variants joiye (1-5) */
   variants?: number;
+  /** Product hoy to caption ema thi banse. */
+  product?: {
+    title: string;
+    description?: string;
+    price?: number;
+    currency?: string;
+    url: string;
+    brand?: string;
+  };
 };
 
 export type GeneratedPost = {
@@ -70,7 +33,7 @@ export type GeneratedPost = {
   imagePrompt: string;
 };
 
-const RESPONSE_SCHEMA = {
+const POSTS_SCHEMA = {
   type: "object",
   properties: {
     posts: {
@@ -89,7 +52,8 @@ const RESPONSE_SCHEMA = {
           },
           imagePrompt: {
             type: "string",
-            description: "A short prompt describing an image that suits this post.",
+            description:
+              "A detailed prompt for an image generator describing a photo that suits this post. Describe subject, setting, lighting and mood. No text overlays.",
           },
         },
         required: ["caption", "hashtags", "imagePrompt"],
@@ -99,7 +63,7 @@ const RESPONSE_SCHEMA = {
   },
   required: ["posts"],
   additionalProperties: false,
-} as const;
+};
 
 const PLATFORM_RULES: Record<GenerateInput["platform"], string> = {
   facebook:
@@ -120,10 +84,31 @@ export async function generatePosts(
     "Return only the structured output requested.",
   ].join(" ");
 
-  const userPrompt = [
+  const productBlock = input.product
+    ? [
+        "",
+        "You are promoting this specific product. Use only these facts:",
+        `Product: ${input.product.title}`,
+        input.product.brand ? `Brand: ${input.product.brand}` : "",
+        input.product.price
+          ? `Price: ${input.product.currency ?? ""} ${input.product.price}`
+          : "",
+        input.product.description
+          ? `Details: ${input.product.description.slice(0, 900)}`
+          : "",
+        "",
+        "Do not state a price, discount, or shipping claim that is not listed above.",
+        "End the caption with a call to action pointing to the link in bio / link below.",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : "";
+
+  const prompt = [
     `Write ${variants} distinct ${input.platform} post${variants > 1 ? "s" : ""}.`,
     "",
-    `Topic: ${input.topic}`,
+    input.product ? "" : `Topic: ${input.topic}`,
+    productBlock,
     input.brandVoice ? `Brand voice: ${input.brandVoice}` : "",
     input.tone ? `Tone: ${input.tone}` : "",
     input.targetAudience ? `Target audience: ${input.targetAudience}` : "",
@@ -139,46 +124,28 @@ export async function generatePosts(
     .filter(Boolean)
     .join("\n");
 
-  let response;
-  try {
-    response = await getClient().messages.create({
-      model: env.anthropicModel,
-      max_tokens: 4000,
-      system,
-      output_config: {
-        format: { type: "json_schema", schema: RESPONSE_SCHEMA },
-      },
-      messages: [{ role: "user", content: userPrompt }],
-    });
-  } catch (error) {
-    throw friendlyAiError(error);
-  }
+  const { data } = await complete<{ posts: GeneratedPost[] }>({
+    system,
+    prompt,
+    schema: POSTS_SCHEMA,
+    maxTokens: 4000,
+  });
 
-  if (response.stop_reason === "refusal") {
-    throw new Error(
-      "AI e aa topic par lakhvani na paadi. Topic badlo ane fari try karo.",
-    );
-  }
-
-  const text = response.content.find((block) => block.type === "text");
-  if (!text || text.type !== "text") {
-    throw new Error("AI e koi text response na aapyu.");
-  }
-
-  const parsed = JSON.parse(text.text) as { posts: GeneratedPost[] };
-  if (!Array.isArray(parsed.posts) || parsed.posts.length === 0) {
+  if (!Array.isArray(data.posts) || data.posts.length === 0) {
     throw new Error("AI response ma koi post madyo nahi.");
   }
 
-  return parsed.posts.map((post) => ({
+  return data.posts.map((post) => ({
     caption: post.caption.trim(),
-    hashtags: (post.hashtags ?? []).map((tag) => tag.replace(/^#/, "").trim()).filter(Boolean),
+    hashtags: (post.hashtags ?? [])
+      .map((tag) => tag.replace(/^#/, "").trim())
+      .filter(Boolean),
     imagePrompt: post.imagePrompt?.trim() ?? "",
   }));
 }
 
 /* ------------------------------------------------------------------ *
- *  Comment par auto reply / DM
+ *  Comment reply / DM
  * ------------------------------------------------------------------ */
 
 const REPLY_SCHEMA = {
@@ -197,7 +164,7 @@ const REPLY_SCHEMA = {
   },
   required: ["publicReply", "dm"],
   additionalProperties: false,
-} as const;
+};
 
 export async function generateCommentReply(input: {
   comment: string;
@@ -206,6 +173,8 @@ export async function generateCommentReply(input: {
   instruction?: string;
   needsPublicReply: boolean;
   needsDm: boolean;
+  /** DM ma aa product ni link jashe — AI ne khabar hovi joiye. */
+  product?: { title: string; price?: number; currency?: string; url: string };
 }): Promise<{ publicReply: string; dm: string }> {
   const system = [
     "You reply to comments on a brand's social media posts.",
@@ -215,11 +184,23 @@ export async function generateCommentReply(input: {
     "No hashtags. No emoji spam. Do not repeat the commenter's words back verbatim.",
   ].join(" ");
 
-  const userPrompt = [
+  const prompt = [
     `Platform: ${input.platform}`,
     input.username ? `Commenter: ${input.username}` : "",
     `Comment: "${input.comment}"`,
     "",
+    input.product
+      ? [
+          "The DM will promote this product. Use only these facts:",
+          `Product: ${input.product.title}`,
+          input.product.price
+            ? `Price: ${input.product.currency ?? ""} ${input.product.price}`
+            : "",
+          "The product link is appended automatically after your text — do not write the URL yourself.",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "",
     input.instruction ? `Brand instruction: ${input.instruction}` : "",
     "",
     input.needsPublicReply
@@ -232,33 +213,15 @@ export async function generateCommentReply(input: {
     .filter(Boolean)
     .join("\n");
 
-  let response;
-  try {
-    response = await getClient().messages.create({
-      model: env.anthropicModel,
-      max_tokens: 1000,
-      system,
-      output_config: {
-        format: { type: "json_schema", schema: REPLY_SCHEMA },
-      },
-      messages: [{ role: "user", content: userPrompt }],
-    });
-  } catch (error) {
-    throw friendlyAiError(error);
-  }
+  const { data } = await complete<{ publicReply: string; dm: string }>({
+    system,
+    prompt,
+    schema: REPLY_SCHEMA,
+    maxTokens: 1000,
+  });
 
-  if (response.stop_reason === "refusal") {
-    throw new Error("AI e aa comment no jawab aapvani na paadi.");
-  }
-
-  const text = response.content.find((block) => block.type === "text");
-  if (!text || text.type !== "text") {
-    throw new Error("AI e koi reply na aapyu.");
-  }
-
-  const parsed = JSON.parse(text.text) as { publicReply: string; dm: string };
   return {
-    publicReply: (parsed.publicReply ?? "").trim(),
-    dm: (parsed.dm ?? "").trim(),
+    publicReply: (data.publicReply ?? "").trim(),
+    dm: (data.dm ?? "").trim(),
   };
 }

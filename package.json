@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "mongo": "node scripts/mongo.mjs",
+    "n8n": "node scripts/n8n.mjs",
+    "n8n:setup": "node scripts/n8n-setup.mjs",
     "seed": "node scripts/seed.mts"
   },
   "dependencies": {

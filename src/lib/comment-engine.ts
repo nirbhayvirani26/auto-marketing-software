@@ -1,5 +1,6 @@
 import { CommentEvent, CommentRule, type CommentRuleDoc } from "@/models/CommentRule";
 import { SocialAccount, type SocialAccountDoc } from "@/models/SocialAccount";
+import { Product, type ProductDoc } from "@/models/Product";
 import { logActivity } from "@/models/ActivityLog";
 import { env } from "./env";
 import { generateCommentReply } from "./ai";
@@ -42,8 +43,23 @@ export function ruleMatches(rule: CommentRuleDoc, text: string): boolean {
   }
 }
 
-/** DM ma link hoy to ene message na chhede jodi de. */
-function composeDm(rule: CommentRuleDoc, body: string): string {
+/**
+ * DM na chhede link jode.
+ * Product jodyu hoy to ENI link (ane price) jaay che, nahi to manual link.
+ */
+function composeDm(
+  rule: CommentRuleDoc,
+  body: string,
+  product?: ProductDoc | null,
+): string {
+  if (product) {
+    const price =
+      product.price != null
+        ? ` — ${product.currency ?? ""}${product.price}`.trimEnd()
+        : "";
+    return `${body}\n\n🛒 ${product.title}${price}\n${product.url}`;
+  }
+
   if (!rule.dmLinkUrl) return body;
   const title = rule.dmLinkTitle?.trim();
   return `${body}\n\n${title ? `${title}: ` : ""}${rule.dmLinkUrl}`;
@@ -167,6 +183,9 @@ export async function handleIncomingComment(
   let publicText = rule.publicReplyText ?? "";
   let dmBody = rule.dmText ?? "";
 
+  // Rule saathe product jodayelu hoy to eni link DM ma jashe.
+  const product = rule.product ? await Product.findById(rule.product) : null;
+
   if (rule.useAi) {
     try {
       const ai = await generateCommentReply({
@@ -176,6 +195,14 @@ export async function handleIncomingComment(
         instruction: rule.aiInstruction ?? undefined,
         needsPublicReply: Boolean(rule.publicReply),
         needsDm: Boolean(rule.sendDm),
+        product: product
+          ? {
+              title: product.title,
+              price: product.price ?? undefined,
+              currency: product.currency ?? undefined,
+              url: product.url,
+            }
+          : undefined,
       });
       if (rule.publicReply) publicText = ai.publicReply || publicText;
       if (rule.sendDm) dmBody = ai.dm || dmBody;
@@ -204,7 +231,7 @@ export async function handleIncomingComment(
   // 7. Private DM
   if (rule.sendDm && dmBody.trim()) {
     try {
-      const message = composeDm(rule, dmBody);
+      const message = composeDm(rule, dmBody, product);
       if (incoming.platform === "facebook") {
         await sendFacebookPrivateReply({
           commentId: incoming.commentId,

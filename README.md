@@ -215,6 +215,31 @@ curl -X POST http://localhost:3000/api/cron/dispatch \
 
 ## 6. n8n integration
 
+### Local setup — 2 command
+
+```bash
+# ek j vaar: n8n install karo
+npm install -g n8n
+
+# terminal 3 — n8n chalu karo (data .n8n-data/ ma rahe che)
+npm run n8n
+
+# terminal 4 — app saathe jodo (token banave, workflows import + activate kare)
+npm run n8n:setup
+```
+
+`npm run n8n:setup` aa badhu jate kare che:
+
+1. App ma login karine **API token** banave ane `.env` ma `N8N_API_TOKEN` save kare
+2. n8n ma **owner account** banave (`.env` na `SEED_ADMIN_*` thi)
+3. `n8n/*.json` na **3 workflows import** kare — token ane secrets bharine
+4. Workflows **activate** kare
+
+Pachi <http://localhost:5678> kholo — badhu taiyar hashe.
+
+> n8n no badho data project ni andar `.n8n-data/` ma rahe che (gitignored),
+> etle restart thay to pan workflows ane credentials jata nathi.
+
 ### App → n8n (outbound events)
 
 App `N8N_WEBHOOK_URL` par POST kare che:

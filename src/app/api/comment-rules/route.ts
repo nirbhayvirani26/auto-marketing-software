@@ -16,6 +16,7 @@ const createSchema = z.object({
   dmText: z.string().optional(),
   dmLinkUrl: z.string().optional(),
   dmLinkTitle: z.string().optional(),
+  product: z.string().optional(),
   useAi: z.boolean().default(false),
   aiInstruction: z.string().optional(),
   onlyOncePerUser: z.boolean().default(true),

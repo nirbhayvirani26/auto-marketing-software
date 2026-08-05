@@ -15,6 +15,7 @@ const updateSchema = z.object({
   dmText: z.string().optional(),
   dmLinkUrl: z.string().optional(),
   dmLinkTitle: z.string().optional(),
+  product: z.string().optional(),
   useAi: z.boolean().optional(),
   aiInstruction: z.string().optional(),
   onlyOncePerUser: z.boolean().optional(),

@@ -6,3 +6,6 @@ build
 .DS_Store
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# n8n local data (workflows, credentials, encryption key)
+.n8n-data/

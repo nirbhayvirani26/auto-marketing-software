@@ -32,6 +32,9 @@ import BoltIcon from "@mui/icons-material/BoltOutlined";
 import HistoryIcon from "@mui/icons-material/HistoryOutlined";
 import StorefrontIcon from "@mui/icons-material/StorefrontOutlined";
 import ChatIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
+import HubIcon from "@mui/icons-material/HubOutlined";
+import ShoppingBagIcon from "@mui/icons-material/ShoppingBagOutlined";
+import RocketIcon from "@mui/icons-material/RocketLaunchOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import { useColorMode } from "@/theme/ThemeRegistry";
@@ -41,12 +44,15 @@ const DRAWER_WIDTH = 248;
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: DashboardIcon, exact: true },
+  { href: "/admin/setup", label: "Setup", icon: RocketIcon },
   { href: "/admin/brands", label: "Brands", icon: StorefrontIcon },
   { href: "/admin/accounts", label: "Social Accounts", icon: GroupsIcon },
   { href: "/admin/campaigns", label: "Campaigns", icon: CampaignIcon },
+  { href: "/admin/products", label: "Products", icon: ShoppingBagIcon },
   { href: "/admin/posts", label: "Posts", icon: ArticleIcon },
   { href: "/admin/automations", label: "Automations", icon: BoltIcon },
   { href: "/admin/dm-rules", label: "Auto DM & Replies", icon: ChatIcon },
+  { href: "/admin/integrations", label: "Integrations & API", icon: HubIcon },
   { href: "/admin/logs", label: "Activity Logs", icon: HistoryIcon },
   { href: "/admin/settings", label: "Settings", icon: SettingsIcon },
 ];

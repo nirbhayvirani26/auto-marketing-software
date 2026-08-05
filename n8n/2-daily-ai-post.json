@@ -1,0 +1,185 @@
+{
+  "name": "Auto Marketing — 2. Roj AI post (Facebook + Instagram)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "days", "daysInterval": 1, "triggerAtHour": 9, "triggerAtMinute": 30 }
+          ]
+        }
+      },
+      "id": "daily",
+      "name": "Roj 9:30 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-620, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "topic",
+              "name": "topic",
+              "type": "string",
+              "value": "Aaje no marketing tip — nana business owners mate practical salah"
+            },
+            {
+              "id": "img",
+              "name": "imageUrl",
+              "type": "string",
+              "value": "https://picsum.photos/1080/1080"
+            },
+            {
+              "id": "brand",
+              "name": "brandSlug",
+              "type": "string",
+              "value": "default"
+            }
+          ]
+        }
+      },
+      "id": "topic",
+      "name": "Aaje Nu Topic",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-400, 0],
+      "notes": "Topic ahiya badlo. Sheet/Airtable mathi pan lai shakay."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.AM_BASE_URL }}/api/v1/accounts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.AM_TOKEN }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "accounts",
+      "name": "Accounts Levo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-180, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.accounts.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-accounts",
+      "name": "Accounts Che?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [60, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AM_BASE_URL }}/api/v1/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.AM_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ brandSlug: $('Aaje Nu Topic').item.json.brandSlug, topic: $('Aaje Nu Topic').item.json.topic, imageUrl: $('Aaje Nu Topic').item.json.imageUrl, publish: true }) }}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "create",
+      "name": "AI Post Banavo + FB/IG par Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [300, -60],
+      "notes": "topic aapo -> AI FB ane IG mate alag caption banave -> badha accounts par publish"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ok",
+              "name": "published",
+              "type": "array",
+              "value": "={{ $json.data.created.filter(c => c.published) }}"
+            },
+            {
+              "id": "bad",
+              "name": "failed",
+              "type": "array",
+              "value": "={{ $json.data.created.filter(c => c.published === false) }}"
+            },
+            {
+              "id": "skip",
+              "name": "skipped",
+              "type": "array",
+              "value": "={{ $json.data.skipped }}"
+            },
+            {
+              "id": "msg",
+              "name": "message",
+              "type": "string",
+              "value": "=✅ {{ $json.data.created.filter(c => c.published).length }} publish thaya | ❌ {{ $json.data.created.filter(c => c.published === false).length }} fail | ⏭ {{ $json.data.skipped.length }} skip"
+            }
+          ]
+        }
+      },
+      "id": "result",
+      "name": "Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [560, -60]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "warn",
+              "name": "warning",
+              "type": "string",
+              "value": "Ek pan connected account nathi — Admin panel ma accounts connect karo"
+            }
+          ]
+        }
+      },
+      "id": "no-accounts",
+      "name": "Koi Account Nathi",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [300, 120]
+    }
+  ],
+  "connections": {
+    "Roj 9:30 AM": { "main": [[{ "node": "Aaje Nu Topic", "type": "main", "index": 0 }]] },
+    "Aaje Nu Topic": { "main": [[{ "node": "Accounts Levo", "type": "main", "index": 0 }]] },
+    "Accounts Levo": { "main": [[{ "node": "Accounts Che?", "type": "main", "index": 0 }]] },
+    "Accounts Che?": {
+      "main": [
+        [{ "node": "AI Post Banavo + FB/IG par Publish", "type": "main", "index": 0 }],
+        [{ "node": "Koi Account Nathi", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Post Banavo + FB/IG par Publish": {
+      "main": [[{ "node": "Result", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "instanceId": "auto-marketing" },
+  "tags": []
+}

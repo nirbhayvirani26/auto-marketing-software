@@ -1,0 +1,141 @@
+{
+  "name": "Auto Marketing — 1. Scheduler (har minute)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] }
+      },
+      "id": "tick",
+      "name": "Har Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-420, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AM_BASE_URL }}/api/cron/dispatch",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-cron-secret", "value": "={{ $env.AM_CRON_SECRET }}" }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "dispatch",
+      "name": "Due Posts + Automations Chalavo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-180, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.postsProcessed + $json.data.automationsProcessed }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "had-work",
+      "name": "Kai Kaam Thayu?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [80, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s",
+              "name": "summary",
+              "type": "string",
+              "value": "={{ $json.data.postsProcessed }} post publish thaya, {{ $json.data.automationsProcessed }} automation chalya"
+            },
+            {
+              "id": "f",
+              "name": "failures",
+              "type": "array",
+              "value": "={{ $json.data.postResults.filter(r => !r.ok) }}"
+            }
+          ]
+        }
+      },
+      "id": "summary",
+      "name": "Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [320, -80]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.failures.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-fail",
+      "name": "Koi Fail Thayu?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [560, -80]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "alert",
+              "name": "alert",
+              "type": "string",
+              "value": "=⚠️ Publish fail: {{ $json.failures.map(f => f.error).join(' | ') }}"
+            }
+          ]
+        }
+      },
+      "id": "alert",
+      "name": "Alert (Slack/Email ahiya jodo)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [800, -160]
+    }
+  ],
+  "connections": {
+    "Har Minute": {
+      "main": [[{ "node": "Due Posts + Automations Chalavo", "type": "main", "index": 0 }]]
+    },
+    "Due Posts + Automations Chalavo": {
+      "main": [[{ "node": "Kai Kaam Thayu?", "type": "main", "index": 0 }]]
+    },
+    "Kai Kaam Thayu?": {
+      "main": [[{ "node": "Summary", "type": "main", "index": 0 }], []]
+    },
+    "Summary": {
+      "main": [[{ "node": "Koi Fail Thayu?", "type": "main", "index": 0 }]]
+    },
+    "Koi Fail Thayu?": {
+      "main": [
+        [{ "node": "Alert (Slack/Email ahiya jodo)", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "instanceId": "auto-marketing" },
+  "tags": []
+}
