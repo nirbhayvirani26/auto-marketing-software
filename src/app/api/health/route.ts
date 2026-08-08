@@ -80,7 +80,7 @@ export const GET = handle(async () => {
         facebook: byPlatform.facebook ?? 0,
         instagram: byPlatform.instagram ?? 0,
       },
-      appUrl: process.env.APP_URL ?? "http://localhost:3000",
+      appUrl: process.env.APP_URL || "http://localhost:3000",
       webhookVerifyTokenSet: Boolean(process.env.META_WEBHOOK_VERIFY_TOKEN),
     },
   });

@@ -20,6 +20,41 @@ const AutomationSchema = new Schema(
     // AI ne aapva mate topic / theme
     topic: { type: String, trim: true, required: true },
     tone: { type: String, trim: true, default: "friendly" },
+
+    /**
+     * post — sadho text/image post (juno vartav)
+     * reel — dar vakhate ek product ni image lai ne AKHI reel banave ane
+     *        Instagram + Facebook banne par muki de. "Set karo ane bhuli jao."
+     */
+    mode: {
+      type: String,
+      enum: ["post", "reel"],
+      default: "post",
+      index: true,
+    },
+
+    /**
+     * Reel mode mate — kai image vaparvi:
+     *   library — brand ni upload kareli product images ma thi vaari fari
+     *             (jе sauthi juni vaparai hoy e pehla — badha product ne
+     *             vaaro male che)
+     *   fixed   — niche aapeli j images
+     */
+    reelSource: {
+      type: String,
+      enum: ["library", "fixed"],
+      default: "library",
+    },
+    reelImages: [{ type: Schema.Types.ObjectId, ref: "MediaAsset" }],
+    /** Ek reel ma ketla product (library mode ma). */
+    reelProductCount: { type: Number, default: 1, min: 1, max: 10 },
+    reelDuration: { type: Number, default: 40, min: 15, max: 90 },
+    reelLanguage: { type: String, default: "en" },
+    reelAvatar: { type: Schema.Types.ObjectId, ref: "Avatar" },
+    reelVoiceover: { type: Boolean, default: false },
+    /** Chhelli var kai image sudhi pahonchya — library ma vaaro rakhva mate. */
+    reelCursor: { type: Number, default: 0 },
+
     frequency: {
       type: String,
       enum: ["hourly", "daily", "weekly"],

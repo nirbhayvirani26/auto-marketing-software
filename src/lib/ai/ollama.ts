@@ -10,11 +10,11 @@ import { AiError, type AiProvider, type CompletionRequest } from "./types";
  *   3. .env ma:      OLLAMA_MODEL=llama3.2
  */
 function host(): string {
-  return (process.env.OLLAMA_HOST ?? "http://127.0.0.1:11434").replace(/\/$/, "");
+  return (process.env.OLLAMA_HOST || "http://127.0.0.1:11434").replace(/\/$/, "");
 }
 
 function modelName(): string {
-  return process.env.OLLAMA_MODEL ?? "llama3.2";
+  return process.env.OLLAMA_MODEL || "llama3.2";
 }
 
 export const ollamaProvider: AiProvider = {

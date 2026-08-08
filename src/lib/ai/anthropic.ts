@@ -4,11 +4,11 @@ import { AiError, type AiProvider, type CompletionRequest } from "./types";
 let client: Anthropic | null = null;
 
 function apiKey(): string {
-  return process.env.ANTHROPIC_API_KEY ?? "";
+  return process.env.ANTHROPIC_API_KEY || "";
 }
 
 function modelName(): string {
-  return process.env.ANTHROPIC_MODEL ?? "claude-opus-5";
+  return process.env.ANTHROPIC_MODEL || "claude-opus-5";
 }
 
 function getClient(): Anthropic {

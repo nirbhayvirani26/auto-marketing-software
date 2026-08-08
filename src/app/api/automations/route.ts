@@ -17,6 +17,19 @@ const createSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6).default(1),
   autoPublish: z.boolean().default(false),
   enabled: z.boolean().default(true),
+
+  /**
+   * reel = dar vakhate ek product ni image lai ne AKHI reel banave ane
+   * Instagram + Facebook banne par muki de. "Set karo ane bhuli jao."
+   */
+  mode: z.enum(["post", "reel"]).default("post"),
+  reelSource: z.enum(["library", "fixed"]).default("library"),
+  reelImages: z.array(z.string()).optional(),
+  reelProductCount: z.number().int().min(1).max(10).default(1),
+  reelDuration: z.number().int().min(15).max(90).default(40),
+  reelLanguage: z.enum(["en", "hi", "gu", "hinglish"]).default("en"),
+  reelAvatar: z.string().optional(),
+  reelVoiceover: z.boolean().default(false),
 });
 
 export const GET = handle(async () => {
@@ -40,6 +53,8 @@ export const POST = handle(async (request) => {
     ...body,
     brand: ctx.brandId,
     campaign: body.campaign || undefined,
+    reelAvatar: body.reelAvatar || undefined,
+    reelImages: body.reelImages?.length ? body.reelImages : undefined,
     nextRunAt: computeNextRun(body),
     createdBy: ctx.session.sub,
   });

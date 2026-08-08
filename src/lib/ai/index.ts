@@ -1,5 +1,7 @@
 import { anthropicProvider } from "./anthropic";
 import { geminiProvider } from "./gemini";
+import { groqProvider } from "./groq";
+import { openrouterProvider } from "./openrouter";
 import { ollamaProvider } from "./ollama";
 import { AiError, type AiProvider, type CompletionRequest, type ProviderKey } from "./types";
 
@@ -8,9 +10,11 @@ export type { AiProvider, ProviderKey };
 export { ollamaPing } from "./ollama";
 
 const PROVIDERS: Record<ProviderKey, AiProvider> = {
-  anthropic: anthropicProvider,
   gemini: geminiProvider,
+  groq: groqProvider,
+  openrouter: openrouterProvider,
   ollama: ollamaProvider,
+  anthropic: anthropicProvider,
 };
 
 export function allProviders(): AiProvider[] {
@@ -26,7 +30,7 @@ export function allProviders(): AiProvider[] {
  * ek key khutay to pan marketing atkatu nathi.
  */
 export function resolveProviderChain(preferred?: string): AiProvider[] {
-  const wanted = (preferred ?? process.env.AI_PROVIDER ?? "").toLowerCase();
+  const wanted = (preferred || process.env.AI_PROVIDER || "").toLowerCase();
 
   const configured = allProviders().filter((p) => p.configured());
   // Free pehla — paid chhelle.

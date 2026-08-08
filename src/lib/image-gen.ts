@@ -63,7 +63,7 @@ export function imageProviderStatus() {
       key: "gemini" as const,
       label: "Google Imagen (free tier)",
       free: true,
-      configured: Boolean(process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY),
+      configured: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
       note: "GEMINI_API_KEY joiye",
     },
   ];
@@ -84,7 +84,7 @@ export async function generateImage(opts: {
     "pollinations";
 
   if (provider === "gemini") {
-    const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
+    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (key) {
       try {
         return await generateWithGemini(opts.prompt, key);
@@ -112,7 +112,7 @@ async function generateWithGemini(
   prompt: string,
   key: string,
 ): Promise<GeneratedImage> {
-  const model = process.env.GEMINI_IMAGE_MODEL ?? "imagen-3.0-generate-002";
+  const model = process.env.GEMINI_IMAGE_MODEL || "imagen-3.0-generate-002";
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${key}`,
     {

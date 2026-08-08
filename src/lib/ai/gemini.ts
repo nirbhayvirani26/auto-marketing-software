@@ -9,11 +9,18 @@ import { AiError, type AiProvider, type CompletionRequest } from "./types";
 const BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 function apiKey(): string {
-  return process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
+  return process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
 }
 
+/**
+ * ⚠️ Google dareak key ne badha model nu free tier NATHI aapto.
+ * Ketlik key par `gemini-2.0-flash` "limit: 0" aape che pan
+ * `gemini-flash-latest` (alias) barabar chale che.
+ *
+ * Etle default `-latest` alias rakhyo che — e sauthi vadhu key par chale.
+ */
 function modelName(): string {
-  return process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+  return process.env.GEMINI_MODEL || "gemini-flash-latest";
 }
 
 /**
@@ -67,7 +74,11 @@ export const geminiProvider: AiProvider = {
           generationConfig: {
             responseMimeType: "application/json",
             responseSchema: toGeminiSchema(request.schema),
-            maxOutputTokens: request.maxTokens ?? 4000,
+            // ⚠️ THINKING TOKENS: nava flash models jawab aapta pehla
+            // andar-khane vichare che, ane E VICHAR PAN aa limit ma thi
+            // gane che. Nanu limit aapo to jawab KHALI aave — koi error
+            // vagar. Etle jagya vadhari daiye chie.
+            maxOutputTokens: Math.max(request.maxTokens ?? 4000, 512) + 2048,
           },
         }),
         signal: AbortSignal.timeout(120_000),
@@ -92,8 +103,18 @@ export const geminiProvider: AiProvider = {
       const message = json.error?.message ?? `HTTP ${response.status}`;
 
       if (response.status === 429) {
+        // "limit: 0" = aa key ne AA MODEL nu free tier apayu j nathi.
+        // E rate limit NATHI — raah jovathi kai nahi thay, bijo model
+        // ke bijo provider joiye.
+        if (message.includes("limit: 0")) {
+          throw new AiError(
+            `Gemini: "${modelName()}" aa key mate chalu nathi (free tier quota 0). ` +
+              `.env ma GEMINI_MODEL=gemini-flash-latest karo, athva Groq vapro (free).`,
+            "gemini",
+          );
+        }
         throw new AiError(
-          "Gemini free tier ni limit lagi gai (15 request/minute). Thodi var pachi try karo.",
+          "Gemini ni rate limit lagi gai. Thodi var pachi apoaap fari try thashe.",
           "gemini",
           true,
         );

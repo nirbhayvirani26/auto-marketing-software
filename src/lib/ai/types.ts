@@ -1,6 +1,11 @@
 /** Badha AI providers ne ek j interface — code ne khabar nathi kayo provider che. */
 
-export type ProviderKey = "anthropic" | "gemini" | "ollama";
+export type ProviderKey =
+  | "anthropic"
+  | "gemini"
+  | "groq"
+  | "openrouter"
+  | "ollama";
 
 export type JsonSchema = Record<string, unknown>;
 

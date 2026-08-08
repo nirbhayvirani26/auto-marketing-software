@@ -65,7 +65,7 @@ export function authorizeUrl(state: string): string {
   const url = new URL(
     `https://www.facebook.com/${env.metaGraphVersion}/dialog/oauth`,
   );
-  url.searchParams.set("client_id", process.env.META_APP_ID ?? "");
+  url.searchParams.set("client_id", process.env.META_APP_ID || "");
   url.searchParams.set("redirect_uri", redirectUri());
   url.searchParams.set("state", state);
   url.searchParams.set("scope", META_SCOPES);
@@ -91,8 +91,8 @@ async function graphGet<T>(path: string, params: Record<string, string>) {
 /** Authorization code -> long-lived user access token. */
 export async function exchangeCodeForUserToken(code: string): Promise<string> {
   const short = await graphGet<{ access_token: string }>("/oauth/access_token", {
-    client_id: process.env.META_APP_ID ?? "",
-    client_secret: process.env.META_APP_SECRET ?? "",
+    client_id: process.env.META_APP_ID || "",
+    client_secret: process.env.META_APP_SECRET || "",
     redirect_uri: redirectUri(),
     code,
   });
@@ -101,8 +101,8 @@ export async function exchangeCodeForUserToken(code: string): Promise<string> {
   // kadi expire nathi thata.
   const long = await graphGet<{ access_token: string }>("/oauth/access_token", {
     grant_type: "fb_exchange_token",
-    client_id: process.env.META_APP_ID ?? "",
-    client_secret: process.env.META_APP_SECRET ?? "",
+    client_id: process.env.META_APP_ID || "",
+    client_secret: process.env.META_APP_SECRET || "",
     fb_exchange_token: short.access_token,
   });
 

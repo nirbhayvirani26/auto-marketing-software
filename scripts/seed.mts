@@ -168,13 +168,13 @@ async function seedPlans() {
 
 async function seedSuperAdmin() {
   const User = model("User", "users");
-  const email = (process.env.SUPERADMIN_EMAIL ?? "superadmin@example.com").toLowerCase();
-  const password = process.env.SUPERADMIN_PASSWORD ?? "Super@12345";
+  const email = (process.env.SUPERADMIN_EMAIL || "superadmin@example.com").toLowerCase();
+  const password = process.env.SUPERADMIN_PASSWORD || "Super@12345";
 
   await User.findOneAndUpdate(
     { email },
     {
-      name: process.env.SUPERADMIN_NAME ?? "Super Admin",
+      name: process.env.SUPERADMIN_NAME || "Super Admin",
       email,
       passwordHash: await bcrypt.hash(password, 12),
       role: "superadmin",
@@ -195,9 +195,9 @@ async function seedOrgOwner() {
   const Plan = model("Plan", "plans");
   const Brand = model("Brand", "brands");
 
-  const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@example.com").toLowerCase();
-  const password = process.env.SEED_ADMIN_PASSWORD ?? "Admin@12345";
-  const orgName = process.env.SEED_ORG_NAME ?? "My Company";
+  const email = (process.env.SEED_ADMIN_EMAIL || "admin@example.com").toLowerCase();
+  const password = process.env.SEED_ADMIN_PASSWORD || "Admin@12345";
+  const orgName = process.env.SEED_ORG_NAME || "My Company";
 
   const plan =
     (await Plan.findOne({ key: "agency" })) ?? (await Plan.findOne({}));
@@ -205,7 +205,7 @@ async function seedOrgOwner() {
   const user = await User.findOneAndUpdate(
     { email },
     {
-      name: process.env.SEED_ADMIN_NAME ?? "Org Owner",
+      name: process.env.SEED_ADMIN_NAME || "Org Owner",
       email,
       passwordHash: await bcrypt.hash(password, 12),
       role: "owner",
@@ -328,7 +328,7 @@ async function main() {
   loadEnvFile();
 
   const uri =
-    process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017/auto_marketing";
+    process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/auto_marketing";
   console.log(`Connecting to ${uri} …\n`);
   await mongoose.connect(uri, { serverSelectionTimeoutMS: 8000 });
 

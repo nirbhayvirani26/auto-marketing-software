@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="gu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login — Auto Marketing</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ version }}">
+</head>
+<body class="centered">
+  <form class="card login" method="post" action="/login">
+    <h1>🎬 Auto Marketing</h1>
+    <p class="muted">
+      Product ni image mukho — AI reel banavi ne Instagram + Facebook par
+      jate post kari deshe.
+    </p>
+
+    {% if error %}
+      <div class="alert error">{{ error }}</div>
+    {% endif %}
+
+    <label>
+      Email
+      <input type="email" name="email" value="{{ hint_email }}" required autofocus>
+    </label>
+
+    <label>
+      Password
+      <input type="password" name="password" required>
+    </label>
+
+    <input type="hidden" name="next" id="nextField">
+      <button type="submit" class="primary big">Login</button>
+
+    <p class="muted small">
+      Pehli var? <code>.env</code> na <code>SEED_ADMIN_EMAIL</code> ane
+      <code>SEED_ADMIN_PASSWORD</code> thi login thai jashe — account jate
+      bani gayu che.
+    </p>
+  </form>
+  <script>
+    // Koi #products jevi deep link par thi aavyu hoy to login
+    // pachi e j tab par pacho lai jaie chie.
+    document.getElementById('nextField').value =
+      new URLSearchParams(location.search).get('next') || ('/' + location.hash);
+  </script>
+</body>
+</html>

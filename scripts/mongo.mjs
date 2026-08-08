@@ -9,7 +9,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-const home = process.env.MONGO_HOME ?? "D:\\mongodb";
+const home = process.env.MONGO_HOME || "D:\\mongodb";
 
 function findMongod(root) {
   if (!existsSync(root)) return null;

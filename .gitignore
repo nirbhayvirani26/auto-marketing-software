@@ -9,3 +9,15 @@ tsconfig.tsbuildinfo
 
 # n8n local data (workflows, credentials, encryption key)
 .n8n-data/
+
+# Upload thayeli image, render thayela reels, temp render files
+storage/
+
+
+# Python edition — download thayeli binary, fonts ane render thayela reels
+python/storage/
+python/vendor/
+python/assets/fonts/
+python/.env
+__pycache__/
+*.py[cod]

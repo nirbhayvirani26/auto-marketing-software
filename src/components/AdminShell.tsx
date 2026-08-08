@@ -35,6 +35,8 @@ import ChatIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
 import HubIcon from "@mui/icons-material/HubOutlined";
 import ShoppingBagIcon from "@mui/icons-material/ShoppingBagOutlined";
 import RocketIcon from "@mui/icons-material/RocketLaunchOutlined";
+import MovieIcon from "@mui/icons-material/MovieCreationOutlined";
+import FaceIcon from "@mui/icons-material/Face3Outlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import { useColorMode } from "@/theme/ThemeRegistry";
@@ -45,6 +47,8 @@ const DRAWER_WIDTH = 248;
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: DashboardIcon, exact: true },
   { href: "/admin/setup", label: "Setup", icon: RocketIcon },
+  { href: "/admin/studio", label: "Reel Studio", icon: MovieIcon },
+  { href: "/admin/avatars", label: "Avatars", icon: FaceIcon },
   { href: "/admin/brands", label: "Brands", icon: StorefrontIcon },
   { href: "/admin/accounts", label: "Social Accounts", icon: GroupsIcon },
   { href: "/admin/campaigns", label: "Campaigns", icon: CampaignIcon },

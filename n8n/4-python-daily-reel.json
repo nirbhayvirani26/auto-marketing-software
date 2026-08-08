@@ -1,0 +1,207 @@
+{
+  "name": "4 · Roj ek reel — Python app (auto post)",
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "days", "triggerAtHour": 11, "triggerAtMinute": 0 }
+          ]
+        }
+      },
+      "id": "trigger",
+      "name": "Roj savare 11 vage",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-360, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.PY_BASE_URL }}/api/uploads?role=product&limit=60",
+        "options": { "timeout": 30000 },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.PY_API_KEY }}" }
+          ]
+        }
+      },
+      "id": "list-images",
+      "name": "Product images lavo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-140, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Roj ALAG product ni reel jaay — nahi to ek j product\n// vaar var jashe ane log kantaadi jashe.\n//\n// Divas na aankda thi vaaro nakki karie chie: 1 taarikhe pehli\n// image, 2 e biji... ane list puri thay etle fari shuru.\nconst files = $input.first().json.data ?? [];\nif (!files.length) {\n  throw new Error(\n    'Ek pan product image nathi. Reel Studio (http://localhost:8000) ma ' +\n    'jaine images upload karo — pachi aa workflow roj emathi reel banavse.'\n  );\n}\n\nconst dayOfYear = Math.floor(\n  (Date.now() - Date.UTC(new Date().getUTCFullYear(), 0, 0)) / 86400000\n);\n\n// Ek reel ma ketla product (1 = ek product ni reel, 3 = collection reel)\nconst PER_REEL = Number($env.PY_PRODUCTS_PER_REEL || 1);\n\nconst picked = [];\nfor (let i = 0; i < Math.min(PER_REEL, files.length); i++) {\n  picked.push(files[(dayOfYear * PER_REEL + i) % files.length].id);\n}\n\nreturn [{ json: { image_asset_ids: picked } }];"
+      },
+      "id": "pick",
+      "name": "Aaje kayo product",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [80, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PY_BASE_URL }}/api/studio/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.PY_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  image_asset_ids: $json.image_asset_ids,\n  mode: $json.image_asset_ids.length > 1 ? 'multi' : 'single',\n  target_duration: Number($env.PY_REEL_SECONDS || 30),\n  language: $env.PY_REEL_LANGUAGE || 'en',\n  voiceover: true,\n  hint: $env.PY_REEL_HINT || ''\n}) }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "generate",
+      "name": "Reel banavvanu shuru karo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [300, 300]
+    },
+    {
+      "parameters": { "amount": 45, "unit": "seconds" },
+      "id": "wait",
+      "name": "45 second raah",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [520, 300],
+      "webhookId": "py-reel-wait"
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.PY_BASE_URL }}/api/studio/jobs/{{ $('Reel banavvanu shuru karo').first().json.data.job_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.PY_API_KEY }}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "check",
+      "name": "Taiyar thayu?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "version": 2 },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.data.status }}",
+                    "rightValue": "done",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "taiyar"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "version": 2 },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.data.status }}",
+                    "rightValue": "failed",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "fail"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra", "renameFallbackOutput": "hju chalu" }
+      },
+      "id": "switch",
+      "name": "Status jovo",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PY_BASE_URL }}/api/studio/jobs/{{ $('Reel banavvanu shuru karo').first().json.data.job_id }}/publish",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.PY_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  when: $env.PY_PUBLISH_WHEN || 'now',\n  hashtags_in_first_comment: true\n}) }}",
+        "options": { "timeout": 600000 }
+      },
+      "id": "publish",
+      "name": "Instagram + Facebook par mukho",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reel fail thayu — karan spashta rite batavo.\nconst job = $input.first().json.data ?? {};\nconst failed = (job.steps ?? []).filter((s) => s.status === 'failed');\n\nthrow new Error(\n  'Reel na banyu: ' + (job.error ?? 'karan khabar nathi') +\n  (failed.length\n    ? '\\nFail thayela step: ' +\n      failed.map((s) => `${s.key} (${s.error ?? ''})`).join(', ')\n    : '')\n);"
+      },
+      "id": "fail",
+      "name": "Bhool batavo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Hju banai rahyu che — pacha 'raah' par jaine fari puchhie.\n//\n// Reel banta 1-4 minute lage che, etle 45 second na 12 vaar =\n// 9 minute sudhi raah joie chie. Ena pachi pan na thay to bhool.\nconst tries = ($runIndex ?? 0) + 1;\nif (tries > 12) {\n  throw new Error(\n    'Reel 9 minute ma pan taiyar na thayu. ' +\n    'http://localhost:8000 ma \"Mari Reels\" tab ma joi lo.'\n  );\n}\nreturn $input.all();"
+      },
+      "id": "again",
+      "name": "Fari puchho",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "Roj savare 11 vage": {
+      "main": [[{ "node": "Product images lavo", "type": "main", "index": 0 }]]
+    },
+    "Product images lavo": {
+      "main": [[{ "node": "Aaje kayo product", "type": "main", "index": 0 }]]
+    },
+    "Aaje kayo product": {
+      "main": [[{ "node": "Reel banavvanu shuru karo", "type": "main", "index": 0 }]]
+    },
+    "Reel banavvanu shuru karo": {
+      "main": [[{ "node": "45 second raah", "type": "main", "index": 0 }]]
+    },
+    "45 second raah": {
+      "main": [[{ "node": "Taiyar thayu?", "type": "main", "index": 0 }]]
+    },
+    "Taiyar thayu?": {
+      "main": [[{ "node": "Status jovo", "type": "main", "index": 0 }]]
+    },
+    "Status jovo": {
+      "main": [
+        [{ "node": "Instagram + Facebook par mukho", "type": "main", "index": 0 }],
+        [{ "node": "Bhool batavo", "type": "main", "index": 0 }],
+        [{ "node": "Fari puchho", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fari puchho": {
+      "main": [[{ "node": "45 second raah", "type": "main", "index": 0 }]]
+    }
+  }
+}

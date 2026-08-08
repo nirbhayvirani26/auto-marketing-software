@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="gu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reel Studio — Auto Marketing</title>
+  {# ?v={{ version }} — aa vagar browser junu CSS/JS pakdi rakhe che ane
+     app update thaya pachi pan juni bhool dekhaya kare che. #}
+  <link rel="stylesheet" href="/static/app.css?v={{ version }}">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">🎬 Auto Marketing <span class="tag">v{{ version }}</span></div>
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="studio">Reel Studio</button>
+    <button class="tab" data-tab="products">Product Links</button>
+    <button class="tab" data-tab="reels">Mari Reels</button>
+    <button class="tab" data-tab="posts">Posts</button>
+    <button class="tab" data-tab="accounts">Accounts</button>
+    <button class="tab" data-tab="avatars">Avatars</button>
+    <button class="tab" data-tab="autodm">Auto DM</button>
+    <button class="tab" data-tab="setup">Setup</button>
+  </nav>
+  <a class="ghost" href="/logout">Logout</a>
+</header>
+
+<div id="banner"></div>
+
+<!-- ============ STUDIO ============ -->
+<main class="page active" id="page-studio">
+  <div class="grid">
+
+    <section class="col">
+      <div class="card">
+        <h2>1 · Product ni image</h2>
+        <p class="muted">
+          Ek image = ek product ni reel. Ghani image mukho to badha product
+          ni ek j collection reel banse.
+        </p>
+
+        <div class="drop" id="drop">
+          <input type="file" id="fileInput" multiple accept="image/*" hidden>
+          <div class="drop-inner">
+            <div class="big-icon">🖼</div>
+            <div>Image ahiya khenchi ne mukho, ke click karo</div>
+          </div>
+        </div>
+
+        <div class="thumbs" id="thumbs"></div>
+      </div>
+
+      <div class="card">
+        <h2>2 · Kevi reel joiye</h2>
+
+        <label>Lambai — <b id="durLabel">40</b> second
+          <input type="range" id="duration" min="15" max="90" step="5" value="40">
+        </label>
+
+        <label>Avatar (marji nu)
+          <select id="avatarSelect"><option value="">Avatar vagar — fakt product</option></select>
+          <span class="hint">Avatar hoy to e product pehri ne reel ma dekhaay che</span>
+        </label>
+
+        <label>Bhasha
+          <select id="language">
+            <option value="en">English</option>
+            <option value="hinglish">Hinglish</option>
+            <option value="hi">हिन्दी</option>
+            <option value="gu">ગુજરાતી</option>
+          </select>
+        </label>
+
+        <label>Product vishe kaink kehvu che? (marji nu)
+          <textarea id="hint" rows="2"
+            placeholder="pure cotton, machine washable, 6 colour ma"></textarea>
+          <span class="hint">AI image joine j badhu kadhe che — pan tame kaho e ne vadhu maan aape</span>
+        </label>
+
+        <div class="row">
+          <label>Kimat <input id="price" placeholder="₹1,299"></label>
+          <label>Product link <input id="productUrl" placeholder="https://…"></label>
+        </div>
+
+        <label class="check">
+          <input type="checkbox" id="voiceover"> Voiceover naakho (free AI awaj)
+        </label>
+
+        <hr>
+
+        <label>Reference reel (marji nu)
+          <input type="file" id="refInput" accept="video/*">
+          <span class="hint">
+            Koi reel game to eni STYLE ni nakal thashe — tamara product ane
+            tamari avatar sathe. (Video download karine ahiya mukho.)
+          </span>
+        </label>
+        <div id="refName" class="muted small"></div>
+      </div>
+
+      <button class="primary big block" id="generateBtn" disabled>Reel banavo</button>
+    </section>
+
+    <section class="col wide">
+      <div class="card" id="result">
+        <div class="empty">
+          <div class="big-icon">🎬</div>
+          <h3>Reel ahiya dekhashe</h3>
+          <p class="muted">
+            Image mukho ane "Reel banavo" dabavo. AI image joine product
+            samjse, atyare je trending che e shodhse, script lakhse, video
+            banavse, music naakhse ane Instagram + Facebook mate alag alag
+            caption lakhse.
+          </p>
+        </div>
+      </div>
+
+      <div class="card hidden" id="publishCard">
+        <h2>Publish karo</h2>
+        <p class="muted">
+          Instagram ma je jashe e j Facebook ma pan jashe — pan dareak
+          platform mate alag caption ane alag hashtag sathe.
+        </p>
+
+        <label>Accounts
+          <div id="accountPicker" class="picker"></div>
+        </label>
+
+        <label>Kyare
+          <select id="when">
+            <option value="now">Atyare j publish karo</option>
+            <option value="auto">Sauthi saara vakhate apoaap goothvo</option>
+            <option value="draft">Fakt draft banavo</option>
+          </select>
+        </label>
+
+        <label class="check">
+          <input type="checkbox" id="firstComment" checked>
+          Hashtag pehla comment ma mukho (Instagram par saru dekhay)
+        </label>
+
+        <button class="primary" id="publishBtn">Publish karo</button>
+        <div id="publishResult"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- ============ BIJA PAGE ============ -->
+<!-- ============ PRODUCT LINKS ============ -->
+<main class="page" id="page-products">
+  <div class="grid">
+    <section class="col">
+      <div class="card">
+        <h2>Website ni product link paste karo</h2>
+        <p class="muted">
+          Image upload karvani jarur NATHI. Link aapo — naam, kimat, varnan
+          ane images apoaap aavi jashe, ane e j reel ma vaparashe.
+        </p>
+
+        <label>Link(s)
+          <textarea id="productLinks" rows="6"
+            placeholder="https://mystore.com/products/blue-kurti&#10;https://mystore.com/products/red-saree&#10;&#10;(ek pachi ek line ma — ek saathe 25 sudhi)"></textarea>
+          <span class="hint">Ghani link ek saathe paste kari shako cho</span>
+        </label>
+
+        <button class="primary" id="addLinksBtn">Product add karo</button>
+        <div id="linkResult"></div>
+      </div>
+
+      <div class="card" id="reelFromProductCard" style="display:none">
+        <h2>Pasand karela product ni reel</h2>
+        <p class="muted" id="pickedInfo">Ek ke ghana product pasand karo.</p>
+
+        <label>Lambai — <b id="pDurLabel">30</b> second
+          <input type="range" id="pDuration" min="15" max="90" step="5" value="30">
+        </label>
+
+        <label>Bhasha
+          <select id="pLanguage">
+            <option value="en">English</option>
+            <option value="hinglish">Hinglish</option>
+            <option value="hi">हिन्दी</option>
+            <option value="gu">ગુજરાતી</option>
+          </select>
+        </label>
+
+        <label class="check">
+          <input type="checkbox" id="pVoiceover"> Voiceover naakho
+        </label>
+
+        <label>Ketli image banavvi
+          <select id="aiImageCount">
+            <option value="2">2 image</option>
+            <option value="3" selected>3 image</option>
+            <option value="4">4 image</option>
+          </select>
+          <span class="hint">Dareak ma ALAG angle ane ALAG AI background</span>
+        </label>
+
+        <button class="primary" id="aiPackBtn">AI thi image + video banavo</button>
+        <span class="hint">
+          Tamaro ASLI product rahe che — AI fakt navu background banave che.
+          (AI thi product fari banavie to heera/setting badlai jaay.)
+        </span>
+        <div id="aiPackResult"></div>
+
+        <hr>
+        <button id="productReelBtn">Fakt reel banavo (asli image thi)</button>
+      </div>
+    </section>
+
+    <section class="col">
+      <div class="card">
+        <h2>Tamara products</h2>
+        <div id="productList"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<main class="page" id="page-reels"><div class="card"><h2>Mari Reels</h2><div id="reelList"></div></div></main>
+<main class="page" id="page-posts"><div class="card"><h2>Posts</h2><div id="postList"></div></div></main>
+
+<main class="page" id="page-accounts">
+  <div class="card">
+    <h2>Social Accounts</h2>
+    <p class="muted">
+      Ek j var Facebook thi login karo — tamara badha Page ane emna sathe
+      jodayela Instagram Business account jate aavi jashe.
+    </p>
+    <a class="primary" href="/api/oauth/meta/start">Connect with Facebook</a>
+    <div id="accountList"></div>
+    <details>
+      <summary>Meta app kai rite banavvo? (free, 5 minute)</summary>
+      <div id="metaHelp" class="muted small"></div>
+    </details>
+  </div>
+</main>
+
+<main class="page" id="page-avatars">
+  <div class="card">
+    <h2>Avatars</h2>
+    <p class="muted">
+      Avatar etle reel ma dekhaati vyakti — tame, tamaro model, ke AI e
+      banavelo chehro. Ek var 2-3 saaf photo aapo, pachi AI dareak reel ma
+      e j chehro rakhse. Product apparel hoy to avatar e product
+      <b>pehri ne</b> dekhashe.
+    </p>
+
+    <div class="row">
+      <label>Naam <input id="avatarName" placeholder="Priya"></label>
+      <label>Photo <input type="file" id="avatarPhotos" multiple accept="image/*"></label>
+    </div>
+    <button class="primary" id="avatarSaveBtn">Avatar banavo</button>
+    <div id="avatarList" class="thumbs"></div>
+  </div>
+</main>
+
+<!-- ============ AUTO DM ============ -->
+<main class="page" id="page-autodm">
+  <div class="grid">
+    <section class="col">
+      <div class="card">
+        <h2>Auto DM</h2>
+        <p class="muted">
+          Koi comment kare etle apoaap jawab ane product ni LINK nu DM.
+          Aa sauthi vadhu vechan aapto rasto che — kharidnaru raah nathi jotu.
+        </p>
+
+        <label>Rule nu naam
+          <input id="dmName" placeholder="Link magnara ne DM">
+        </label>
+
+        <label>Kaya shabd par chale
+          <input id="dmKeywords" placeholder="price, link, kitla, bhav, size">
+          <span class="hint">Comma thi alag karo. KHALI rakho to BADHA comment par chalse.</span>
+        </label>
+
+        <label>AI ne vadharani suchna (marji nu)
+          <textarea id="dmInstruction" rows="2"
+            placeholder="Price DM ma j aapo, ane website par lai jao"></textarea>
+        </label>
+
+        <div class="row">
+          <label class="check"><input type="checkbox" id="dmPublic" checked> Jaher ma pan jawab aapo</label>
+          <label class="check"><input type="checkbox" id="dmSend" checked> DM moklo</label>
+        </div>
+
+        <button class="primary" id="saveDmBtn">Rule save karo</button>
+      </div>
+
+      <div class="card">
+        <h2>Test karo — sachu DM moklya vagar</h2>
+        <label>Nakli comment
+          <input id="dmTest" placeholder="kitla nu che?">
+        </label>
+        <button id="testDmBtn">Su jawab jashe e batavo</button>
+        <div id="dmTestResult"></div>
+      </div>
+    </section>
+
+    <section class="col">
+      <div class="card">
+        <h2>Tamara rules</h2>
+        <div id="dmRuleList"></div>
+      </div>
+      <div class="card">
+        <h2>Aa chalu karva mate</h2>
+        <p class="muted">
+          Meta ne aapna sudhi comment ni khabar moklvi pade che, ane ena mate
+          PUBLIC https URL joiye — <code>localhost</code> nahi chale.
+        </p>
+        <ol class="muted" style="padding-left:18px;line-height:1.9">
+          <li><code>ngrok http 8000</code> chalavo</li>
+          <li>Meta app → Webhooks → Page ane Instagram</li>
+          <li>Callback URL: <code>&lt;ngrok-url&gt;/api/webhooks/meta</code></li>
+          <li>Verify token: <code>.env</code> nu <code>META_WEBHOOK_VERIFY_TOKEN</code></li>
+          <li>Fields: <code>comments</code> ane <code>feed</code></li>
+        </ol>
+      </div>
+    </section>
+  </div>
+</main>
+
+<main class="page" id="page-setup">
+  <div class="card">
+    <h2>Setup</h2>
+    <button class="primary" id="probeBtn">Badhu kharekhar chale che? — test karo</button>
+    <p class="muted small">
+      Dareak service ne ek nani sachi request mokle che. "Key set che" ane
+      key <b>kaam kare che</b> — e be alag vaat che.
+    </p>
+    <div id="probeResult"></div>
+    <div id="statusList"></div>
+  </div>
+</main>
+
+<script src="/static/app.js?v={{ version }}"></script>
+<script src="/static/products-dm.js?v={{ version }}"></script>
+</body>
+</html>

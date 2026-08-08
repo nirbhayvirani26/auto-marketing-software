@@ -56,6 +56,9 @@ type Post = {
   platform: string;
   status: string;
   mediaUrl?: string;
+  thumbnailUrl?: string;
+  postType?: string;
+  seo?: { score?: number };
   scheduledAt?: string;
   publishedAt?: string;
   permalink?: string;
@@ -335,12 +338,56 @@ export default function PostsPage() {
                       {post.caption.slice(0, 160)}
                       {post.caption.length > 160 ? "…" : ""}
                     </Typography>
-                    {post.batchId && (
-                      <Chip
-                        size="small"
-                        variant="outlined"
-                        label="multi-account"
-                        sx={{ mt: 0.5, height: 20, fontSize: 11 }}
+                    <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
+                      {post.postType && post.postType !== "image" && (
+                        <Chip
+                          size="small"
+                          color={post.postType === "reel" ? "secondary" : "default"}
+                          label={post.postType}
+                          sx={{ height: 20, fontSize: 11 }}
+                        />
+                      )}
+                      {post.batchId && (
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label="multi-account"
+                          sx={{ height: 20, fontSize: 11 }}
+                        />
+                      )}
+                      {post.seo?.score != null && (
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          color={
+                            post.seo.score >= 85
+                              ? "success"
+                              : post.seo.score >= 70
+                                ? "warning"
+                                : "default"
+                          }
+                          label={`ranking ${post.seo.score}`}
+                          sx={{ height: 20, fontSize: 11 }}
+                        />
+                      )}
+                    </Stack>
+
+                    {post.postType === "reel" && post.mediaUrl && (
+                      <Box
+                        component="video"
+                        src={post.mediaUrl}
+                        poster={post.thumbnailUrl}
+                        controls
+                        preload="none"
+                        playsInline
+                        sx={{
+                          mt: 1,
+                          width: 108,
+                          height: 192,
+                          borderRadius: 1.5,
+                          bgcolor: "common.black",
+                          display: "block",
+                        }}
                       />
                     )}
                     {post.error && (

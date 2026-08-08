@@ -1,4 +1,9 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import mongoose, {
+  Schema,
+  type HydratedDocument,
+  type InferSchemaType,
+  type Model,
+} from "mongoose";
 
 /**
  * Ek connected social profile.
@@ -54,6 +59,9 @@ SocialAccountSchema.index(
 export type SocialAccountDoc = InferSchemaType<typeof SocialAccountSchema> & {
   _id: mongoose.Types.ObjectId;
 };
+
+/** DB mathi aavelu jivant document. */
+export type SocialAccountDocument = HydratedDocument<SocialAccountDoc>;
 
 export const SocialAccount: Model<SocialAccountDoc> =
   (mongoose.models.SocialAccount as Model<SocialAccountDoc>) ||

@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Secrets
+.env
+
+# Download thayeli free binary ane fonts (scripts fari lai aavse)
+vendor/
+assets/fonts/
+
+# Upload thayeli image, render thayela reels, temp file
+storage/

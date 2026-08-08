@@ -11,7 +11,7 @@ function getTransporter(): Transporter {
   if (!transporter) {
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT ?? 587),
+      port: Number(process.env.SMTP_PORT || 587),
       secure: process.env.SMTP_SECURE === "true",
       auth: {
         user: process.env.SMTP_USER,
@@ -49,7 +49,7 @@ export async function sendEmail(opts: {
 
   try {
     await getTransporter().sendMail({
-      from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: opts.to,
       subject: opts.subject,
       text: opts.text,
@@ -62,7 +62,7 @@ export async function sendEmail(opts: {
   }
 }
 
-const BRAND_NAME = process.env.APP_NAME ?? "Auto Marketing";
+const BRAND_NAME = process.env.APP_NAME || "Auto Marketing";
 
 function layout(title: string, body: string): string {
   return `<!doctype html><html><body style="margin:0;background:#F6F7FB;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">

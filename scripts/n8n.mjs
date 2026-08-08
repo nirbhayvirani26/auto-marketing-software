@@ -12,7 +12,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const dataDir = process.env.N8N_USER_FOLDER ?? join(projectRoot, ".n8n-data");
+const dataDir = process.env.N8N_USER_FOLDER || join(projectRoot, ".n8n-data");
 
 mkdirSync(dataDir, { recursive: true });
 
@@ -49,7 +49,7 @@ function findN8n() {
   }
 
   if (isWindows) {
-    candidates.push(join(process.env.APPDATA ?? "", "npm", binName));
+    candidates.push(join(process.env.APPDATA || "", "npm", binName));
     candidates.push(join("C:", "Program Files", "nodejs", binName));
   } else {
     candidates.push("/usr/local/bin/n8n", "/usr/bin/n8n");
@@ -73,13 +73,39 @@ const env = {
   N8N_USER_FOLDER: dataDir,
   // Localhost par https nathi, etle secure cookie band.
   N8N_SECURE_COOKIE: "false",
+  // ⚠️ n8n shuru thata j bahar (license, telemetry, template, version
+  // server) par call kare che. Jo internet dhimu hoy ke firewall block
+  // kare, to n8n port par to sambhale che PAN JAWAB J NATHI AAPTU —
+  // "fetch failed" / timeout aave che ane samjatu nathi ke su thayu.
+  //
+  // Aa badhu band karvathi n8n turant ubhu thai jaay che ane local
+  // kaam ma kai j farak nathi padto.
   N8N_DIAGNOSTICS_ENABLED: "false",
   N8N_VERSION_NOTIFICATIONS_ENABLED: "false",
+  N8N_TEMPLATES_ENABLED: "false",
+  N8N_ONBOARDING_FLOW_DISABLED: "true",
+  N8N_HIRING_BANNER_ENABLED: "false",
+  N8N_PERSONALIZATION_ENABLED: "false",
+  EXTERNAL_FRONTEND_HOOKS_URLS: "",
+  N8N_DIAGNOSTICS_CONFIG_FRONTEND: "",
+  N8N_DIAGNOSTICS_CONFIG_BACKEND: "",
+  // Workflow import/activate mate public API joiye che.
+  N8N_PUBLIC_API_DISABLED: "false",
+
   // Workflows aa env vars vaapre che — .env mathi aapoaap bharay che.
   AM_BASE_URL: appUrl,
   AM_CRON_SECRET: readEnv("CRON_SECRET"),
   AM_N8N_SECRET: readEnv("N8N_WEBHOOK_SECRET"),
   AM_TOKEN: readEnv("N8N_API_TOKEN"),
+
+  // Python edition — `4-python-daily-reel.json` aa vaapre che.
+  PY_BASE_URL: readEnv("PY_APP_URL") || "http://127.0.0.1:8000",
+  PY_API_KEY: readEnv("PY_API_KEY"),
+  PY_REEL_SECONDS: readEnv("PY_REEL_SECONDS") || "30",
+  PY_REEL_LANGUAGE: readEnv("PY_REEL_LANGUAGE") || "en",
+  PY_REEL_HINT: readEnv("PY_REEL_HINT") || "",
+  PY_PRODUCTS_PER_REEL: readEnv("PY_PRODUCTS_PER_REEL") || "1",
+  PY_PUBLISH_WHEN: readEnv("PY_PUBLISH_WHEN") || "now",
 };
 
 console.log(`Starting n8n`);

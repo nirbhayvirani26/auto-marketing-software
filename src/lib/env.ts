@@ -3,7 +3,9 @@
  * silently producing `undefined` deep inside a request handler.
  */
 function required(name: string, fallback?: string): string {
-  const value = process.env[name] ?? fallback;
+  // `||` jaani joine — .env ma `KEY=` (khali) hoy tyare pan fallback lagu
+  // padvu joiye. `??` khali string ne "set thayelu" gane che.
+  const value = process.env[name] || fallback;
   if (!value) {
     throw new Error(
       `Missing required environment variable "${name}". Copy .env.example to .env and fill it in.`,
@@ -13,7 +15,7 @@ function required(name: string, fallback?: string): string {
 }
 
 function optional(name: string, fallback = ""): string {
-  return process.env[name] ?? fallback;
+  return process.env[name] || fallback;
 }
 
 export const env = {

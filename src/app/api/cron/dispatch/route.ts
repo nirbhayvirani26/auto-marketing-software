@@ -6,6 +6,7 @@ import { Automation } from "@/models/Automation";
 import { publishPost } from "@/lib/publisher";
 import { runAutomation } from "@/lib/automation-runner";
 import { logActivity } from "@/models/ActivityLog";
+import { reapStuckJobs } from "@/lib/reels/runner";
 
 export const dynamic = "force-dynamic";
 
@@ -57,10 +58,15 @@ async function dispatch(request: Request) {
     automationResults.push(await runAutomation(String(automation._id)));
   }
 
-  if (duePosts.length || dueAutomations.length) {
+  // --- 3. Atkela reel jobs ---
+  // Server restart thay to "running" ma atkela job kaayam tya rahi jaay che.
+  // Aa ene "failed" kari de che ane queue ma padela job chalu kare che.
+  const reapedReels = await reapStuckJobs().catch(() => 0);
+
+  if (duePosts.length || dueAutomations.length || reapedReels) {
     await logActivity({
       action: "cron.dispatch",
-      message: `Cron tick — ${duePosts.length} post, ${dueAutomations.length} automation process thaya`,
+      message: `Cron tick — ${duePosts.length} post, ${dueAutomations.length} automation, ${reapedReels} atkela reel`,
       meta: { postResults, automationResults },
     });
   }
@@ -69,6 +75,7 @@ async function dispatch(request: Request) {
     ranAt: now.toISOString(),
     postsProcessed: postResults.length,
     automationsProcessed: automationResults.length,
+    reelsReaped: reapedReels,
     postResults,
     automationResults,
   });

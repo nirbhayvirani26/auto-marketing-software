@@ -1,0 +1,36 @@
+# Auto Marketing Software — Python edition
+#
+# BADHU FREE CHE. Ek pan paid package ke paid service nathi.
+# Install: python -m pip install -r requirements.txt
+
+# ---- Web ----
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+jinja2==3.1.5
+python-multipart==0.0.20      # file upload
+itsdangerous==2.2.0           # session cookie signing
+
+# ---- HTTP ----
+httpx==0.28.1                 # async HTTP, badhi API mate
+
+# ---- Database ----
+motor==3.6.0                  # async MongoDB
+pymongo==4.9.2
+
+# ---- Auth ----
+PyJWT==2.10.1
+bcrypt==4.2.1
+
+# ---- Config ----
+python-dotenv==1.0.1
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# ---- Media ----
+Pillow==11.1.0                # image processing
+imageio-ffmpeg==0.5.1         # ffmpeg binary sathe j aave che — kai install nahi
+
+# ---- Voiceover (100% free, koi key nahi) ----
+# DHYAN: version pin NA karo. Microsoft token scheme badlata rahe che ane
+# juno edge-tts 403 aapva mande che. Hamesha navu j vaparo.
+edge-tts>=7.2.8               # Microsoft Edge na awaj — Hindi/Gujarati pan bole che

@@ -4,6 +4,7 @@ import { Brand } from "@/models/Brand";
 import { SocialAccount } from "@/models/SocialAccount";
 import { Automation } from "@/models/Automation";
 import { CommentRule } from "@/models/CommentRule";
+import { ReelJob } from "@/models/ReelJob";
 import { env } from "./env";
 
 export type TenantContext = {
@@ -60,6 +61,19 @@ export async function checkLimit(
     case "postsPerMonth":
       used = ctx.organization.usage?.postsThisMonth ?? 0;
       break;
+    case "reelsPerMonth": {
+      // Reels ne alag ganie chie karan ke ek reel ghana posts banave che
+      // (Instagram + Facebook + biju account) — pan kharch ek j reel no che.
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      used = await ReelJob.countDocuments({
+        brand: { $in: brandIds },
+        createdAt: { $gte: monthStart },
+        status: { $ne: "failed" },
+      });
+      break;
+    }
     default:
       used = 0;
   }

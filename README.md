@@ -1,11 +1,153 @@
 # Auto Marketing Software
 
-AI thi social media post generate karo, schedule karo, ane **Facebook Page** +
-**Instagram Business** par auto publish karo — badhu ek admin panel mathi.
+Product ni **image mukho** — AI baki badhu kare che: product samje, atyare je
+trending che e shodhe, reel no script lakhe, **30-90 second no reel banave**,
+music naakhe, Instagram ane Facebook mate **alag alag caption + hashtags** lakhe,
+ane **auto publish** kare.
 
-**Stack:** Next.js 15 (App Router) · TypeScript · MUI 7 (dark + light theme) ·
-MongoDB (local, Mongoose) · Anthropic Claude (content generation) · n8n
-(workflow automation) · Meta Graph API (publishing)
+**Stack:** Next.js 15 (App Router) · TypeScript · MUI 7 · MongoDB (Mongoose) ·
+ffmpeg (video render) · Gemini / Groq / OpenRouter / Claude (AI, fallback chain) ·
+Meta Graph API (Instagram + Facebook publishing) · n8n (optional automation)
+
+> ### 🐍 Python version pan che — `python/` folder ma
+>
+> **E j feature, pan 100% FREE stack par.** Ghani vastu to KEY VAGAR j
+> chale che: ffmpeg (render), Catbox (hosting), ccMixter (music),
+> **edge-tts** (voiceover — Hindi ane Gujarati sathe), Pollinations
+> (image), Google Trends (keywords). Fakt AI ane Meta mate key joiye,
+> ane e banne pan free che (Groq / Gemini / **Ollama offline**).
+>
+> ```bash
+> cd python
+> pip install -r requirements.txt
+> python scripts/fetch_ffmpeg.py && python scripts/fetch_fonts.py
+> python run.py          # → http://localhost:8000
+> ```
+>
+> Puri vigat: [`python/README.md`](python/README.md)
+
+---
+
+## 🎬 Reel Studio — mukhya feature
+
+**`/admin/studio`** — ahiya badhu thay che.
+
+### Kevi rite kaam kare che
+
+```
+   Product ni image upload karo
+        │
+        ├─ 1. VISION      image joine product samje che: su che, kaya
+        │                 material nu, kona mate, kaya keywords
+        │
+        ├─ 2. TRENDS      Google Autocomplete + Google Trends + AI thi
+        │                 hashtag "ladder" (moti / vachli / NANI tags)
+        │
+        ├─ 3. SCRIPT      shot-by-shot plan — hook, product, benefit, CTA
+        │                 pehla 3 second no hook, dar 2-3 second e badlaav
+        │
+        ├─ 4. IMAGES      je scene mate joiye e AI banave —
+        │                 avatar + tamara kapda sathe (virtual try-on)
+        │
+        ├─ 5. MUSIC       mood pramane copyright-free track
+        │
+        ├─ 6. VOICEOVER   (marji nu) AI awaj
+        │
+        ├─ 7. RENDER      ffmpeg → 1080×1920 · 30fps · H.264 · AAC
+        │                 Ken Burns, transitions, text overlay, cover image
+        │
+        ├─ 8. CAPTION     Instagram ane Facebook mate ALAG caption.
+        │                 Lakhya pachi 0-100 ma marks aape che, ochha
+        │                 aave to AI ne fari lakhavay che.
+        │
+        └─ 9. PUBLISH     IG Reels + FB Reels par ek saathe.
+                          Hashtag pehla comment ma. Sauthi saara vakhate
+                          apoaap goothvi shakay.
+```
+
+### Su su bane che
+
+| Su joiye che | Kai rite |
+|---|---|
+| **Ek product ni reel** | Ek image mukho |
+| **Ghana product ni ek j reel** | Ghani image mukho — dareak ne potano beat male che |
+| **Tamari avatar product pehri ne** | Avatars page ma 2-3 photo aapo, pachi automatic |
+| **Koi bija jevi reel** | E reel ni file upload karo — eni STYLE ni nakal thashe (words nahi) |
+| **Instagram ma je jaay e Facebook ma pan** | Automatic — pan alag caption ane alag hashtag count sathe |
+
+### ⚠️ Trending song vishe — saachi vaat
+
+Instagram nu **licensed trending song** (je app ma Reels banavta vakhate dekhay
+che) **Graph API thi lagavi shakatu NATHI**. Meta e music catalog API ma kholyu
+j nathi — aa koi pan tool kari shakatu nathi, ane aa aapna code ni kami nathi.
+
+Etle app be vastu kare che:
+
+1. **Reel ni andar copyright-free music bake kare che** (Jamendo / Creative
+   Commons) — aa 100% auto-post thay che ane copyright strike no dar nathi.
+2. **Publish pachi batave che ke IG app ma kayo trending sound shodhvo** —
+   reel → ⋯ → Edit → Audio → suggest karela shabd search karo → Trending
+   filter → sound lagavo. Be tap nu kaam, ane tyare IG no trending-audio
+   boost pan male che.
+
+### ⚠️ Public URL joiye j che
+
+Meta na server **tamari file download kare che**. Etle `localhost` kyarey nahi
+chale. Ek karo:
+
+- **Cloudinary** (recommended, free 25GB) — `CLOUDINARY_CLOUD_NAME` +
+  `CLOUDINARY_UPLOAD_PRESET`, athva
+- **Potanu domain / ngrok tunnel** — `PUBLIC_MEDIA_BASE_URL=https://...`
+
+Ek pan na hoy to app key-vagar na anonymous host (Catbox / tmpfiles) par
+padi jaay che — chalе che, pan file bahar public rahe che ane tmpfiles ni
+file 1 kalak pachi khatam thai jaay che. Production ma
+`MEDIA_ALLOW_ANON_HOSTS=false` karo.
+
+### Multi-API pipeline — kaam kyarey atkatu nathi
+
+Dareak bahar na kaam mate provider ni **chain** che. Ek ni free limit lage,
+key khute, ke service down thay to **bijo apoaap** chalu thai jaay che:
+
+| Kaam | Chain (free pehla) |
+|---|---|
+| Lakhan | Gemini → Groq → OpenRouter → Ollama → Claude |
+| Image samajvi | Gemini Vision → Groq → OpenRouter → Claude |
+| Image banavvi | Gemini Image → Pollinations → Replicate |
+| Virtual try-on | IDM-VTON (Replicate) → Gemini Image |
+| Music | Jamendo → ccMixter → tamari mp3 |
+| Voiceover | Gemini TTS → Pollinations → ElevenLabs |
+| Hosting | Cloudinary → ImgBB → Catbox → tmpfiles |
+| Trends | Google Autocomplete + Google Trends + AI |
+
+Sathe: per-provider timeout, exponential backoff + jitter retry, ane
+**circuit breaker** (3 var fail thay to 60 second skip). Halat
+`/admin/setup` par dekhay che.
+
+### Set karo ane bhuli jao — reel automation
+
+`/admin/automations` → **Su banavvu: Reel**
+
+Dar divase (ke kalake/athvadiye) Reel Studio ma upload kareli product images
+ma thi **vaari fari** ek lai ne aakhi reel banse — script, music, caption,
+hashtags badhu — ane Instagram + Facebook banne par jate mukai jashe.
+Tamare fakt product ni images ek var upload karvani.
+
+> Cron chalu hovo joiye — jovo section 5.
+
+### Test karo
+
+```bash
+npm run test:services        # badhi API/service KHAREKHAR chale che? (30 sec)
+npm run test:render          # fakt video engine (30 sec)
+npm run test:pipeline        # 10 round × 195 test — offline, koi key vagar
+npm run test:pipeline -- 10 live   # uper nu + kharekhar AI ne puchhe
+```
+
+`npm run test:services` sauthi kaam nu che — e dareak service ne **ek nani
+sachi request** mokle che. "Key set che" ane "key kaam kare che" e be alag
+vaat che (dakhla tarike key barabar hoy pan credit khatam hoy). Ej test
+admin panel ma **Setup page par button** tarike pan che.
 
 ---
 
@@ -18,7 +160,11 @@ npm run dev       # terminal 2 — app
 
 Pachi <http://localhost:3000/login> → `admin@example.com` / `Admin@12345`
 
-Fakt **`ANTHROPIC_API_KEY`** `.env` ma nakhvani baaki che (AI generation mate).
+Badhu barabar che ke nahi e ek command ma joi lo:
+
+```bash
+npm run test:services
+```
 
 ---
 
@@ -31,12 +177,20 @@ npm install
 # 2. Env file banavo
 cp .env.example .env        # Windows: copy .env.example .env
 
-# 3. .env ma aa 3 value bharo (baki optional che):
+# 3. Reel na text mate free fonts (ek j var)
+npm run fonts
+
+# 4. .env ma aa bharo:
 #    MONGODB_URI      -> mongodb://127.0.0.1:27017/auto_marketing
 #    JWT_SECRET       -> koi pan 32+ character no random string
-#    ANTHROPIC_API_KEY-> console.anthropic.com mathi
+#    GEMINI_API_KEY   -> aistudio.google.com/apikey  (FREE, sauthi jaruri —
+#                        ek j key thi lakhan + image samajvi + image banavvi
+#                        + voiceover — chaarey kaam thai jaay che)
+#    CLOUDINARY_*     -> cloudinary.com (FREE 25GB) — aa vagar Instagram/
+#                        Facebook par post NAHI thay (Meta ne public URL joiye)
+#    META_APP_ID/SECRET -> developers.facebook.com/apps
 
-# 4. MongoDB local chalu karo, pachi admin user banavo
+# 5. MongoDB local chalu karo, pachi admin user banavo
 npm run seed
 #    ...athva sample campaign + automation saathe:
 npm run seed -- --demo
@@ -347,7 +501,21 @@ UI ma multi-account post ne **multi-account** chip lagelo hoy che, ane
 | AI generate par "Missing ANTHROPIC_API_KEY" | `.env` ma key nakho, pachi dev server restart karo |
 | "Invalid OAuth access token" | Accounts page ma Page access token khoto/expire thayelo che |
 | Badha page achanak 500 aape | `next dev` chalu hoy tyare `next build` na chalavo — e `.next` bagade che. Fix: dev band karo → `.next` folder delete karo → `npm run dev` |
-| Instagram publish fail | Image URL public https hovu joiye; `localhost` nahi chale |
+| Instagram publish fail | Image/video URL public https hovu joiye; `localhost` nahi chale |
+
+### Reel Studio
+
+| Problem | Upay |
+|---|---|
+| Build par `EACCES: permission denied, scandir ...\Temp\...` | Next build system na TEMP ne scan kare che ane tya koi bija app ni lock file hoy to atki jaay che. `npm run build` aa fix kari de che (project ni andar potano temp vaapre che). Sidhu `npx next build` chalavta hoy to aa aavse. |
+| "Ek pan provider configure nathi" | `/admin/setup` khollo — tya dekhashe ke KAI key khute che. Sauthi jaruri: `GEMINI_API_KEY` (free). |
+| Instagram par reel fail — "Media ID is not available" | Video no URL public nathi. `CLOUDINARY_*` naakho ke `PUBLIC_MEDIA_BASE_URL` set karo. |
+| Reel ma text na dekhay / chorasa (□□□) dekhay | `npm run fonts` chalavo. Hindi/Gujarati mate e j font laave che. |
+| Reel banta bahu var lage | `RENDER_CONCURRENCY` vadharo (CPU pramane 3-4), ane `targetDuration` ghatado. Sarerash: 40s ni reel ~2-4 minute. |
+| Job "running" ma atki gayo | Server restart thayo hase. Cron dar minute chale che ane 25 minute pachi ene "failed" kari de che — pachi fari Generate dabavo. |
+| Music na madyu | `JAMENDO_CLIENT_ID` naakho (free), athva `storage/music/` ma potani mp3 mukho. |
+| "Instagram trending song kem nathi lagtu?" | Meta e e API kholelu j nathi — koi tool na kari shake. App reel ma copyright-free music naakhe che ane publish pachi IG app ma trending sound kai rite lagavvo e batave che (2 tap). |
+| Avatar no chehro dareak scene ma badlai jaay | `GEMINI_API_KEY` naakho — Gemini 2.5 Flash Image reference photo samje che. Vadhu saacha result mate `REPLICATE_API_TOKEN` (try-on model). |
 
 ## 9. Security notes
 

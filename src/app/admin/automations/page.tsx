@@ -63,12 +63,22 @@ const EMPTY = {
   dayOfWeek: 1,
   autoPublish: false,
   enabled: true,
+
+  // Reel mode
+  mode: "post",
+  reelSource: "library",
+  reelProductCount: 1,
+  reelDuration: 40,
+  reelLanguage: "en",
+  reelAvatar: "",
+  reelVoiceover: false,
 };
 
 export default function AutomationsPage() {
   const [automations, setAutomations] = React.useState<Automation[]>([]);
   const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
+  const [avatars, setAvatars] = React.useState<Array<{ _id: string; name: string }>>([]);
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState(EMPTY);
   const [error, setError] = React.useState<string | null>(null);
@@ -81,11 +91,13 @@ export default function AutomationsPage() {
       apiFetch<Automation[]>("/api/automations"),
       apiFetch<Account[]>("/api/accounts"),
       apiFetch<Campaign[]>("/api/campaigns"),
+      apiFetch<Array<{ _id: string; name: string }>>("/api/avatars").catch(() => []),
     ])
-      .then(([auto, acc, camp]) => {
+      .then(([auto, acc, camp, avs]) => {
         setAutomations(auto);
         setAccounts(acc);
         setCampaigns(camp);
+        setAvatars(avs);
       })
       .catch((e) => setError(e.message));
   }, []);
@@ -293,21 +305,131 @@ export default function AutomationsPage() {
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
+              select
+              label="Su banavvu"
+              value={form.mode}
+              onChange={(e) => setForm({ ...form, mode: e.target.value })}
+              fullWidth
+            >
+              <MenuItem value="post">Post — AI caption (+ image)</MenuItem>
+              <MenuItem value="reel">
+                Reel — aakhi reel banavine jate muki de
+              </MenuItem>
+            </TextField>
+
+            {form.mode === "reel" && (
+              <Alert severity="info" sx={{ py: 0.5 }}>
+                <Typography variant="caption">
+                  Dar run par Reel Studio ma upload kareli product images ma thi
+                  <strong> vaari fari </strong> ek lai ne aakhi reel banse —
+                  script, music, caption, hashtags badhu — ane Instagram +
+                  Facebook banne par jate mukai jashe. Tamare kai j karvanu nahi.
+                </Typography>
+              </Alert>
+            )}
+
+            <TextField
               label="Name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               fullWidth
             />
             <TextField
-              label="Topic / theme"
+              label={form.mode === "reel" ? "Product vishe suchna (marji nu)" : "Topic / theme"}
               value={form.topic}
               onChange={(e) => setForm({ ...form, topic: e.target.value })}
-              placeholder="Daily tip about home fitness"
-              helperText="Aa AI ne dareak run par apashe"
+              placeholder={
+                form.mode === "reel"
+                  ? "handblock cotton, free shipping over ₹999"
+                  : "Daily tip about home fitness"
+              }
+              helperText={
+                form.mode === "reel"
+                  ? "AI image joine j badhu kadhe che — aa fakt vadharani mahiti che"
+                  : "Aa AI ne dareak run par apashe"
+              }
               multiline
               minRows={2}
               fullWidth
             />
+
+            {form.mode === "reel" && (
+              <>
+                <Stack direction="row" spacing={2}>
+                  <TextField
+                    select
+                    label="Ek reel ma ketla product"
+                    value={form.reelProductCount}
+                    onChange={(e) =>
+                      setForm({ ...form, reelProductCount: Number(e.target.value) })
+                    }
+                    fullWidth
+                  >
+                    {[1, 2, 3, 4, 5, 6].map((n) => (
+                      <MenuItem key={n} value={n}>
+                        {n === 1 ? "1 (ek product ni reel)" : `${n} (collection reel)`}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    select
+                    label="Lambai"
+                    value={form.reelDuration}
+                    onChange={(e) =>
+                      setForm({ ...form, reelDuration: Number(e.target.value) })
+                    }
+                    fullWidth
+                  >
+                    {[20, 30, 40, 50, 60, 75, 90].map((n) => (
+                      <MenuItem key={n} value={n}>
+                        {n} second
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Stack>
+
+                <Stack direction="row" spacing={2}>
+                  <TextField
+                    select
+                    label="Bhasha"
+                    value={form.reelLanguage}
+                    onChange={(e) => setForm({ ...form, reelLanguage: e.target.value })}
+                    fullWidth
+                  >
+                    <MenuItem value="en">English</MenuItem>
+                    <MenuItem value="hinglish">Hinglish</MenuItem>
+                    <MenuItem value="hi">हिन्दी</MenuItem>
+                    <MenuItem value="gu">ગુજરાતી</MenuItem>
+                  </TextField>
+                  <TextField
+                    select
+                    label="Avatar"
+                    value={form.reelAvatar}
+                    onChange={(e) => setForm({ ...form, reelAvatar: e.target.value })}
+                    fullWidth
+                  >
+                    <MenuItem value="">Avatar vagar</MenuItem>
+                    {avatars.map((avatar) => (
+                      <MenuItem key={avatar._id} value={avatar._id}>
+                        {avatar.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Stack>
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.reelVoiceover}
+                      onChange={(e) =>
+                        setForm({ ...form, reelVoiceover: e.target.checked })
+                      }
+                    />
+                  }
+                  label="Voiceover naakho"
+                />
+              </>
+            )}
             <TextField
               label="Tone"
               value={form.tone}

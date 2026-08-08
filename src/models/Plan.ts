@@ -22,6 +22,7 @@ const PlanSchema = new Schema(
       brands: { type: Number, default: 1 },
       socialAccounts: { type: Number, default: 3 },
       postsPerMonth: { type: Number, default: 100 },
+      reelsPerMonth: { type: Number, default: 30 },
       users: { type: Number, default: 1 },
       automations: { type: Number, default: 2 },
       commentRules: { type: Number, default: 0 },
@@ -37,6 +38,8 @@ const PlanSchema = new Schema(
       automations: { type: Boolean, default: true },
       autoDm: { type: Boolean, default: false },
       aiGeneration: { type: Boolean, default: true },
+      // Reel Studio — image thi reel + auto post
+      reels: { type: Boolean, default: true },
       n8n: { type: Boolean, default: false },
       apiTokens: { type: Boolean, default: false },
       whiteLabel: { type: Boolean, default: false },
@@ -67,6 +70,7 @@ export type ModuleKey =
   | "automations"
   | "autoDm"
   | "aiGeneration"
+  | "reels"
   | "n8n"
   | "apiTokens"
   | "whiteLabel"
@@ -77,6 +81,7 @@ export type LimitKey =
   | "brands"
   | "socialAccounts"
   | "postsPerMonth"
+  | "reelsPerMonth"
   | "users"
   | "automations"
   | "commentRules";
@@ -95,6 +100,7 @@ export const DEFAULT_PLANS = [
       brands: 1,
       socialAccounts: 3,
       postsPerMonth: 100,
+      reelsPerMonth: 30,
       users: 1,
       automations: 2,
       commentRules: 0,
@@ -105,6 +111,7 @@ export const DEFAULT_PLANS = [
       automations: true,
       autoDm: false,
       aiGeneration: true,
+      reels: true,
       n8n: false,
       apiTokens: false,
       whiteLabel: false,
@@ -130,6 +137,7 @@ export const DEFAULT_PLANS = [
       brands: 5,
       socialAccounts: 20,
       postsPerMonth: 1000,
+      reelsPerMonth: 300,
       users: 5,
       automations: 20,
       commentRules: 20,
@@ -140,6 +148,7 @@ export const DEFAULT_PLANS = [
       automations: true,
       autoDm: true,
       aiGeneration: true,
+      reels: true,
       n8n: true,
       apiTokens: false,
       whiteLabel: false,
@@ -166,6 +175,7 @@ export const DEFAULT_PLANS = [
       brands: -1,
       socialAccounts: -1,
       postsPerMonth: -1,
+      reelsPerMonth: -1,
       users: -1,
       automations: -1,
       commentRules: -1,
@@ -176,6 +186,7 @@ export const DEFAULT_PLANS = [
       automations: true,
       autoDm: true,
       aiGeneration: true,
+      reels: true,
       n8n: true,
       apiTokens: true,
       whiteLabel: true,

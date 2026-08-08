@@ -11,12 +11,13 @@
  *
  * Fari fari chalavi shakay — juna workflows update thay che.
  */
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const N8N = process.env.N8N_URL ?? "http://127.0.0.1:5678";
+const N8N = process.env.N8N_URL || "http://127.0.0.1:5678";
 
 /* ---------------- env helpers ---------------- */
 
@@ -88,6 +89,80 @@ const APP_PASSWORD = readEnv("SEED_ADMIN_PASSWORD") || "Admin@12345";
  */
 const N8N_EMAIL = readEnv("N8N_EMAIL") || APP_EMAIL;
 const N8N_PASSWORD = readEnv("N8N_PASSWORD") || APP_PASSWORD;
+
+/**
+ * Python app ne n8n thi call karva mate ek API key joiye che.
+ * Na hoy to jate banavi ne BANNE .env ma save kari daiye chie
+ * (root nu ane python/ nu) — jethi user ne kai copy-paste karvu na pade.
+ */
+function ensurePythonApiKey() {
+  const existing = readEnv("PY_API_KEY");
+  if (existing) return existing;
+
+  const key = `am_${randomBytes(24).toString("hex")}`;
+  writeEnv("PY_API_KEY", key);
+
+  // python/.env ma pan — Python app tya thi vanche che.
+  const pyEnv = join(projectRoot, "python", ".env");
+  try {
+    let raw = existsSync(pyEnv) ? readFileSync(pyEnv, "utf8") : "";
+    if (/^PY_API_KEY=/m.test(raw)) {
+      raw = raw.replace(/^PY_API_KEY=.*$/m, `PY_API_KEY=${key}`);
+    } else {
+      raw += `
+# n8n ane bija machine ne app call karva devu — jate banyu.
+PY_API_KEY=${key}
+`;
+    }
+    writeFileSync(pyEnv, raw);
+    console.log("✔ Python API key banavi ane banne .env ma save kari");
+  } catch (error) {
+    console.log(`⚠ python/.env ma key na lakhai shaki: ${error.message}`);
+    console.log(`  Jate nakho:  PY_API_KEY=${key}`);
+  }
+
+  return key;
+}
+
+/**
+ * n8n ma Google Gemini credential banave — jethi n8n na potana AI nodes
+ * (Basic LLM Chain, AI Agent...) pan tamari key vapri shake.
+ */
+async function ensureGeminiCredential() {
+  const key = readEnv("GEMINI_API_KEY");
+  if (!key) {
+    console.log("… GEMINI_API_KEY .env ma nathi — n8n credential skip karyu");
+    return;
+  }
+
+  const NAME = "Google Gemini (Auto Marketing)";
+
+  const existing = await http(`${N8N}/rest/credentials`);
+  const found = (existing.json?.data ?? []).find((c) => c.name === NAME);
+  if (found) {
+    console.log(`✔ n8n ma Gemini credential pehla thi che: ${NAME}`);
+    return;
+  }
+
+  const created = await http(`${N8N}/rest/credentials`, {
+    method: "POST",
+    body: JSON.stringify({
+      name: NAME,
+      // n8n ma Google Gemini/PaLM credential no type.
+      type: "googlePalmApi",
+      data: { host: "https://generativelanguage.googleapis.com", apiKey: key },
+    }),
+  });
+
+  if (created.ok) {
+    console.log(`✔ n8n ma Gemini credential banyu: ${NAME}`);
+  } else {
+    console.log(
+      `⚠ Gemini credential na banyu (${created.status}) — n8n UI ma jate ` +
+        `banavi shako: Credentials → Google Gemini(PaLM) API`,
+    );
+  }
+}
 
 async function ensureAppToken() {
   const existing = readEnv("N8N_API_TOKEN");
@@ -192,6 +267,15 @@ async function importWorkflows(token) {
     AM_TOKEN: token,
     AM_CRON_SECRET: readEnv("CRON_SECRET"),
     AM_N8N_SECRET: readEnv("N8N_WEBHOOK_SECRET"),
+
+    // Python edition — `4-python-daily-reel.json` aa vaapre che.
+    PY_BASE_URL: readEnv("PY_APP_URL") || "http://127.0.0.1:8000",
+    PY_API_KEY: ensurePythonApiKey(),
+    PY_REEL_SECONDS: readEnv("PY_REEL_SECONDS") || "30",
+    PY_REEL_LANGUAGE: readEnv("PY_REEL_LANGUAGE") || "en",
+    PY_REEL_HINT: readEnv("PY_REEL_HINT") || "",
+    PY_PRODUCTS_PER_REEL: readEnv("PY_PRODUCTS_PER_REEL") || "1",
+    PY_PUBLISH_WHEN: readEnv("PY_PUBLISH_WHEN") || "now",
   };
 
   const existing = await http(`${N8N}/rest/workflows`);

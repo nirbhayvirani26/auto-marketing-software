@@ -28,6 +28,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopyOutlined";
 import RefreshIcon from "@mui/icons-material/RefreshOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import PageHeader from "@/components/PageHeader";
+import StudioReadiness from "@/components/StudioReadiness";
 import { apiFetch } from "@/lib/client";
 
 type Check = { ok: boolean; label: string; hint?: string; optional?: boolean };
@@ -154,9 +155,11 @@ export default function SetupPage() {
       <Alert severity={done === 4 ? "success" : "info"}>
         <AlertTitle>{done}/4 step puri thai</AlertTitle>
         {done === 4
-          ? "Badhu taiyar che — Products page par link paste karo ane post banavo!"
+          ? "Badhu taiyar che — Reel Studio ma product ni image mukho ane reel banavo!"
           : "Niche na steps puri karo. Dareak step pachi 'Fari check karo' dabavo."}
       </Alert>
+
+      <StudioReadiness />
 
       <Card>
         <CardContent>

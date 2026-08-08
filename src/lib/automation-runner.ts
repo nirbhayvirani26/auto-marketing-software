@@ -3,9 +3,11 @@ import { Campaign } from "@/models/Campaign";
 import { Post } from "@/models/Post";
 import { SocialAccount } from "@/models/SocialAccount";
 import { logActivity } from "@/models/ActivityLog";
+import { MediaAsset } from "@/models/MediaAsset";
 import { generatePosts } from "./ai";
 import { publishPost } from "./publisher";
 import { notifyN8n } from "./n8n";
+import { startReelJob } from "./reels/runner";
 
 /** Frequency pramane next run kyare thay e nakki kare. */
 export function computeNextRun(
@@ -44,7 +46,77 @@ export type AutomationRunResult = {
   created: number;
   published: number;
   errors: string[];
+  /** Reel mode ma — background ma chalu thayelo job. */
+  reelJobId?: string;
 };
+
+/**
+ * Reel automation — "dar divase ek product ni reel banavi ne muki do".
+ *
+ * Reel banta 2-4 minute lage che, etle cron ni request ma raah na jovay.
+ * Ahiya fakt job shuru karie chie; taiyar thay tyare background worker j
+ * ene Instagram + Facebook par muki de che (jovo: ReelJob.autoDistribute).
+ */
+async function startReelAutomation(
+  automation: AutomationDoc,
+  accounts: Array<{ _id: unknown; displayName: string }>,
+): Promise<{ jobId: string; imageCount: number }> {
+  const count = Math.max(1, Math.min(automation.reelProductCount ?? 1, 10));
+
+  let imageIds: string[];
+
+  if (automation.reelSource === "fixed" && automation.reelImages?.length) {
+    imageIds = automation.reelImages.map(String).slice(0, count);
+  } else {
+    // Library — brand ni upload kareli product images ma thi vaari fari,
+    // jethi dareak product ne vaaro male ane ek j product roj na jaay.
+    const library = await MediaAsset.find({
+      brand: automation.brand,
+      kind: "image",
+      role: "product",
+    })
+      .sort({ createdAt: 1 })
+      .select("_id")
+      .lean();
+
+    if (library.length === 0) {
+      throw new Error(
+        "Aa brand ma ek pan product image nathi. Reel Studio ma image upload karo, pachi aa automation apoaap emathi reel banavse.",
+      );
+    }
+
+    const cursor = (automation.reelCursor ?? 0) % library.length;
+    imageIds = Array.from({ length: Math.min(count, library.length) }, (_, i) =>
+      String(library[(cursor + i) % library.length]._id),
+    );
+
+    automation.reelCursor = (cursor + imageIds.length) % library.length;
+  }
+
+  const { jobId } = await startReelJob(
+    {
+      brandId: String(automation.brand),
+      imageAssetIds: imageIds,
+      mode: imageIds.length > 1 ? "multi" : automation.reelAvatar ? "tryon" : "single",
+      avatarId: automation.reelAvatar ? String(automation.reelAvatar) : undefined,
+      targetDuration: automation.reelDuration ?? 40,
+      language: automation.reelLanguage ?? "en",
+      tone: automation.tone ?? undefined,
+      hint: automation.topic,
+      voiceover: automation.reelVoiceover ?? false,
+      createdBy: automation.createdBy ? String(automation.createdBy) : undefined,
+    },
+    {
+      autoDistribute: {
+        accountIds: accounts.map((a) => String(a._id)),
+        when: automation.autoPublish ? "now" : "draft",
+        automationId: String(automation._id),
+      },
+    },
+  );
+
+  return { jobId, imageCount: imageIds.length };
+}
 
 /**
  * Ek automation chalave: AI thi caption banave, dareak selected account mate
@@ -88,6 +160,37 @@ export async function runAutomation(
     return result;
   }
 
+  /* ---------------- Reel mode ---------------- */
+  if (automation.mode === "reel") {
+    try {
+      const started = await startReelAutomation(automation, accounts);
+      result.created = started.imageCount;
+      result.reelJobId = started.jobId;
+    } catch (error) {
+      result.errors.push((error as Error).message);
+    }
+
+    automation.lastRunAt = new Date();
+    automation.runCount = (automation.runCount ?? 0) + 1;
+    automation.nextRunAt = computeNextRun(automation);
+    automation.lastError = result.errors.length ? result.errors.join(" | ") : undefined;
+    await automation.save();
+
+    await logActivity({
+      level: result.errors.length ? "warning" : "success",
+      action: "automation.run",
+      message: result.errors.length
+        ? `"${automation.name}" — reel shuru na thai shakyu`
+        : `"${automation.name}" — reel banavvanu shuru thayu (${result.created} image)`,
+      automation: automation._id,
+      meta: result,
+    });
+
+    await notifyN8n("automation.completed", { ...result, name: automation.name });
+    return result;
+  }
+
+  /* ---------------- Post mode (juno vartav) ---------------- */
   for (const account of accounts) {
     try {
       const [generated] = await generatePosts({
