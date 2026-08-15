@@ -1,4 +1,21 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { model, ObjectId, Schema, type BaseFields } from "@/lib/localdb";
+
+/** A campaign groups brand voice, keywords and target accounts. */
+export type CampaignDoc = BaseFields & {
+  brand: ObjectId;
+  name: string;
+  description?: string;
+  brandVoice: string;
+  targetAudience?: string;
+  keywords: string[];
+  hashtags: string[];
+  callToAction?: string;
+  accounts: ObjectId[];
+  status: "draft" | "active" | "paused" | "completed";
+  startDate?: Date;
+  endDate?: Date;
+  createdBy?: ObjectId;
+};
 
 const CampaignSchema = new Schema(
   {
@@ -10,7 +27,7 @@ const CampaignSchema = new Schema(
     },
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
-    // AI ne aapva mate brand context
+    // Brand context handed to the AI on every generation.
     brandVoice: { type: String, trim: true, default: "friendly, professional" },
     targetAudience: { type: String, trim: true },
     keywords: { type: [String], default: [] },
@@ -30,10 +47,4 @@ const CampaignSchema = new Schema(
   { timestamps: true },
 );
 
-export type CampaignDoc = InferSchemaType<typeof CampaignSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
-
-export const Campaign: Model<CampaignDoc> =
-  (mongoose.models.Campaign as Model<CampaignDoc>) ||
-  mongoose.model<CampaignDoc>("Campaign", CampaignSchema);
+export const Campaign = model<CampaignDoc>("Campaign", CampaignSchema);

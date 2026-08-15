@@ -32,9 +32,7 @@ export const GET = handle(async () => {
     recentLogs,
   ] = await Promise.all([
     Organization.countDocuments(),
-    Organization.aggregate<{ _id: string; count: number }>([
-      { $group: { _id: "$status", count: { $sum: 1 } } },
-    ]),
+    Organization.groupCount("status"),
     User.countDocuments({ role: { $ne: "superadmin" } }),
     Plan.countDocuments({ active: true }),
     Brand.countDocuments(),
@@ -50,33 +48,33 @@ export const GET = handle(async () => {
     ActivityLog.find().sort({ createdAt: -1 }).limit(10).lean(),
   ]);
 
-  // MRR — active/trial organizations na plans no sarvado.
-  const revenue = await Organization.aggregate<{ total: number }>([
-    { $match: { status: { $in: ["active", "trial"] } } },
-    {
-      $lookup: {
-        from: "plans",
-        localField: "plan",
-        foreignField: "_id",
-        as: "planDoc",
-      },
-    },
-    { $unwind: "$planDoc" },
-    { $group: { _id: null, total: { $sum: "$planDoc.priceMonthly" } } },
+  // Monthly recurring revenue — the monthly price of every plan held by an
+  // active or trialling organization.
+  const [paying, allPlans] = await Promise.all([
+    Organization.find({ status: { $in: ["active", "trial"] } })
+      .select("plan")
+      .lean(),
+    Plan.find().select("priceMonthly").lean(),
   ]);
+
+  const priceByPlan = new Map(
+    allPlans.map((plan) => [String(plan._id), plan.priceMonthly ?? 0]),
+  );
+  const mrr = paying.reduce(
+    (total, org) => total + (priceByPlan.get(String(org.plan)) ?? 0),
+    0,
+  );
 
   return ok({
     organizations,
-    byStatus: Object.fromEntries(
-      orgsByStatus.map((row) => [row._id, row.count]),
-    ),
+    byStatus: orgsByStatus,
     users,
     plans,
     brands,
     accounts,
     postsTotal,
     postsThisMonth,
-    mrr: revenue[0]?.total ?? 0,
+    mrr,
     recentOrgs,
     recentLogs,
   });

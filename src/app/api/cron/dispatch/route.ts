@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  */
 async function dispatch(request: Request) {
   const secret = env.cronSecret;
-  if (!secret) return fail("CRON_SECRET .env ma set nathi", 500);
+  if (!secret) return fail("CRON_SECRET is not set in .env", 500);
   if (request.headers.get("x-cron-secret") !== secret) {
     return fail("Invalid cron secret", 401);
   }

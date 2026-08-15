@@ -91,7 +91,7 @@ export function createOpenAiCompatProvider(config: OpenAiCompatConfig) {
         );
       }
       if (response.status === 401 || response.status === 403) {
-        throw new AiError(`${config.label}: key khoti che`, config.key);
+        throw new AiError(`${config.label}: the key is invalid`, config.key);
       }
       // json_schema support na hoy to json_object thi fari try karo.
       if (useSchema && /schema|response_format|not support/i.test(message)) {

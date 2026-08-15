@@ -43,33 +43,33 @@ export type PublicPlan = {
 const FEATURES = [
   {
     icon: AutoAwesomeIcon,
-    title: "AI thi post lakhay",
-    body: "Topic aapo, AI Facebook ane Instagram mate alag alag style ma caption ane hashtags banavi aape — ek saathe ghana variants.",
+    title: "Posts written by AI",
+    body: "Give it a topic and it writes captions and hashtags in a different style for Facebook and for Instagram — several variants at once.",
   },
   {
     icon: GroupsIcon,
     title: "Ghana accounts, ek click",
-    body: "Ek caption select karo ane badha Facebook Pages + Instagram accounts par ek saathe moklo. Dareak nu status alag dekhaay.",
+    body: "Pick one caption and send it to every Facebook Page and Instagram account at once. Each one reports its own status.",
   },
   {
     icon: ScheduleIcon,
-    title: "Schedule ane auto publish",
-    body: "Time nakki karo — scheduler joyu time aavye jate publish kari de. Fail thay to error saathe dekhaay.",
+    title: "Schedule and auto publish",
+    body: "Set a time and the scheduler publishes when it arrives. If something fails, the error is shown against the post.",
   },
   {
     icon: ChatIcon,
     title: "Comment par auto DM",
-    body: "Koi 'price?' lakhe to aapoaap public reply ane private DM jaay — link saathe. Keywords tame nakki karo.",
+    body: "When someone comments 'price?', they get a public reply and a direct message with your link. You choose the keywords.",
   },
   {
     icon: StorefrontIcon,
     title: "Ghana brands",
-    body: "Dareak client ke brand nu alag workspace — alag accounts, alag posts, alag rules. Uper thi switch karo.",
+    body: "A separate workspace for every client or brand — its own accounts, posts and rules. Switch from the top bar.",
   },
   {
     icon: HubIcon,
     title: "n8n automation",
-    body: "API token thi n8n ne jodo. Tamari koi pan workflow mathi post banavo, publish karo ke automation chalavo.",
+    body: "Connect n8n with an API token. Create a post, publish it, or run an automation from any workflow you already have.",
   },
 ];
 
@@ -127,7 +127,7 @@ export default function LandingPage({ plans }: { plans: PublicPlan[] }) {
               Login
             </Button>
             <Button component={Link} href="/register" variant="contained">
-              Free ma shuru karo
+              Start for free
             </Button>
           </Toolbar>
         </Container>
@@ -158,17 +158,17 @@ export default function LandingPage({ plans }: { plans: PublicPlan[] }) {
               lineHeight: 1.1,
             }}
           >
-            Tamari social media,
+            Your social media,
             <br />
-            aapoaap chale.
+            on autopilot.
           </Typography>
           <Typography
             variant="h6"
             color="text.secondary"
             sx={{ mt: 3, fontWeight: 400, maxWidth: 620, mx: "auto" }}
           >
-            AI thi posts banavo, ghana accounts par ek saathe schedule karo, ane
-            comment karnar ne aapoaap DM moklo — badhu ek dashboard mathi.
+            Write posts with AI, schedule them across many accounts at once, and
+            message everyone who comments — from a single dashboard.
           </Typography>
 
           <Stack
@@ -181,11 +181,11 @@ export default function LandingPage({ plans }: { plans: PublicPlan[] }) {
               14 divas free trial
             </Button>
             <Button href="#pricing" variant="outlined" size="large">
-              Plans jovo
+              See plans
             </Button>
           </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: "block" }}>
-            Credit card ni jarur nathi
+            No credit card required
           </Typography>
         </Container>
       </Box>
@@ -197,7 +197,7 @@ export default function LandingPage({ plans }: { plans: PublicPlan[] }) {
             Badhu ek jagya e
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 1 }}>
-            Post banavva thi lai ne customer ne jawab aapva sudhi
+            From writing the post to answering the customer
           </Typography>
         </Box>
 
@@ -244,7 +244,7 @@ export default function LandingPage({ plans }: { plans: PublicPlan[] }) {
               Simple pricing
             </Typography>
             <Typography color="text.secondary" sx={{ mt: 1 }}>
-              Nana business thi lai ne agency sudhi
+              From a single shop to a full agency
             </Typography>
             <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 3 }}>
               <Button
@@ -266,7 +266,7 @@ export default function LandingPage({ plans }: { plans: PublicPlan[] }) {
 
           {plans.length === 0 ? (
             <Typography align="center" color="text.secondary">
-              Plans load na thaya — database chalu che ke check karo.
+              Plans could not be loaded — check that the app can read its data folder.
             </Typography>
           ) : (
             <Grid container spacing={3} justifyContent="center">
@@ -319,7 +319,7 @@ export default function LandingPage({ plans }: { plans: PublicPlan[] }) {
                         fullWidth
                         sx={{ mt: 3 }}
                       >
-                        Shuru karo
+                        Get started
                       </Button>
 
                       <Divider sx={{ my: 3 }} />

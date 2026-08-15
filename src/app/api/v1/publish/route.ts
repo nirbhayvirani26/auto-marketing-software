@@ -25,11 +25,11 @@ export const POST = handle(async (request) => {
 
   const body = schema.parse(await request.json());
   if (!body.postId && !body.batchId) {
-    return fail("`postId` ke `batchId` joiye", 422);
+    return fail("Provide either `postId` or `batchId`", 422);
   }
 
   const brand = await resolveBrand(auth.ctx, body);
-  if (!brand) return fail("Brand madyu nahi", 404);
+  if (!brand) return fail("Brand not found", 404);
 
   // Fakt aa organization na j posts — biji org no post publish na thai jay.
   const posts = await Post.find({
@@ -37,7 +37,7 @@ export const POST = handle(async (request) => {
     ...(body.postId ? { _id: body.postId } : { batchId: body.batchId }),
   }).select("_id");
 
-  if (posts.length === 0) return fail("Post madyo nahi", 404);
+  if (posts.length === 0) return fail("Post not found", 404);
 
   const results = [];
   for (const post of posts) {
@@ -68,7 +68,7 @@ export const PUT = handle(async (request) => {
 
   const body = runSchema.parse(await request.json());
   const brand = await resolveBrand(auth.ctx, body);
-  if (!brand) return fail("Brand madyu nahi", 404);
+  if (!brand) return fail("Brand not found", 404);
 
   const automation = await Automation.findOne({
     brand: brand._id,
@@ -79,7 +79,7 @@ export const PUT = handle(async (request) => {
         : {}),
   });
 
-  if (!automation) return fail("Automation madyu nahi", 404);
+  if (!automation) return fail("Automation not found", 404);
 
   const result = await runAutomation(String(automation._id));
   return ok(result);

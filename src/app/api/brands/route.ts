@@ -31,16 +31,14 @@ export const GET = handle(async () => {
     checkLimit(ctx.tenant, "brands"),
   ]);
 
-  const counts = await SocialAccount.aggregate<{ _id: unknown; count: number }>([
-    { $match: { brand: { $in: brands.map((b) => b._id) } } },
-    { $group: { _id: "$brand", count: { $sum: 1 } } },
-  ]);
-  const countMap = new Map(counts.map((row) => [String(row._id), row.count]));
+  const countByBrand = await SocialAccount.groupCount("brand", {
+    brand: { $in: brands.map((b) => b._id) },
+  });
 
   return ok({
     brands: brands.map((brand) => ({
       ...brand,
-      accountCount: countMap.get(String(brand._id)) ?? 0,
+      accountCount: countByBrand[String(brand._id)] ?? 0,
     })),
     activeBrandId: active ? String(active._id) : null,
     usage,

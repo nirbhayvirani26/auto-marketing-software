@@ -30,7 +30,7 @@ export const POST = handle(async (request) => {
   const email = body.email.toLowerCase().trim();
 
   if (await User.exists({ email })) {
-    return fail("Aa email pehla thi register thayelu che — login karo", 409);
+    return fail("That email is already registered — sign in instead", 409);
   }
 
   // Plan nakki karo (default: starter, ke pehlo visible plan)
@@ -40,7 +40,7 @@ export const POST = handle(async (request) => {
     (await Plan.findOne({ active: true }).sort({ sortOrder: 1 }));
 
   if (!plan) {
-    return fail("Ek pan plan configure nathi — admin no sampark karo", 503);
+    return fail("No plans are configured — please contact the administrator", 503);
   }
 
   const user = await User.create({

@@ -147,7 +147,7 @@ export const GET = handle(async () => {
           label: "Meta App (ID + Secret)",
           free: true,
           configured: Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET),
-          note: "Facebook Login + Instagram Graph API product add karo",
+          note: "Add the Facebook Login and Instagram Graph API products",
         },
       ],
     },

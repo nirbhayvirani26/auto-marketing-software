@@ -48,7 +48,7 @@ export const PATCH = handle(async (request) => {
   const body = patchSchema.parse(await request.json());
 
   const user = await User.findById(body.userId);
-  if (!user) return fail("User madyo nahi", 404);
+  if (!user) return fail("User not found", 404);
 
   // Potej ne demote na kari shakay — nahi to platform lock thai jay.
   if (
@@ -56,7 +56,7 @@ export const PATCH = handle(async (request) => {
     body.role &&
     body.role !== "superadmin"
   ) {
-    return fail("Tame tamaro potano superadmin role kadi na shako", 409);
+    return fail("You cannot remove your own super admin role", 409);
   }
 
   if (body.role) user.role = body.role;

@@ -1,15 +1,66 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { model, ObjectId, Schema, type BaseFields } from "@/lib/localdb";
 
 /**
- * Avatar = reel ma dekhaati vyakti.
+ * An avatar is the person who appears in your reels.
  *
- * Aa tamaro potano photo pan hoi shake, tamara model no, ke AI e banavelo
- * chehro. Ek j avatar badhi reels ma rahe che etle brand ne ek olakh male
- * che — log chehro joine j olakhi jaay ke aa tamari brand che.
+ * It can be a photo of you, of your model, or an AI-generated face. Using the
+ * same avatar across every reel gives the brand a face people recognise.
  *
- * `referencePhotos` sauthi agatya nu che — jetli vadhu angle ni image
- * hase, etli AI chehro sthir rakhi shakshe.
+ * `referencePhotos` matters most: the more angles you supply, the more stable
+ * the face stays across generated scenes.
  */
+export type AvatarDoc = BaseFields & {
+  brand: ObjectId;
+  name: string;
+  /** How the person looks — this description is what the AI receives. */
+  description?: string;
+  /** One to five photos, used to keep the face consistent. */
+  referencePhotos: ObjectId[];
+  /** The clearest face shot. */
+  primaryPhoto?: ObjectId;
+
+  /**
+   * Views generated from the reference photos — full body, side, back, face.
+   * These are what the reel pipeline reaches for when it needs the avatar in
+   * a particular pose, instead of hoping one reference happens to suit.
+   */
+  generatedViews: Array<{
+    key: string;
+    label: string;
+    purpose?: string;
+    media: ObjectId;
+    provider?: string;
+    createdAt: Date;
+  }>;
+  gender: "female" | "male" | "non-binary" | "unspecified";
+  ageRange: string;
+  skinTone?: string;
+  hair?: string;
+  bodyType?: string;
+  heightNote?: string;
+  /** Speaking style — drives the voiceover and the on-screen text. */
+  persona: string;
+  /** "en" | "hi" | "gu" | "hinglish" */
+  language: string;
+  /** The kind of clothing or look this avatar wears. */
+  wardrobeNotes?: string;
+  /** Where the shot should look like it was taken. */
+  settingNotes?: string;
+  /** One default avatar per brand. */
+  isDefault: boolean;
+  active: boolean;
+  createdBy?: ObjectId;
+};
+
+const GeneratedViewSchema = new Schema({
+  key: { type: String, required: true },
+  label: { type: String, required: true },
+  purpose: { type: String },
+  media: { type: Schema.Types.ObjectId, ref: "MediaAsset", required: true },
+  provider: { type: String },
+  createdAt: { type: Date, default: () => new Date() },
+});
+
 const AvatarSchema = new Schema(
   {
     brand: {
@@ -20,13 +71,12 @@ const AvatarSchema = new Schema(
     },
 
     name: { type: String, required: true, trim: true },
-    /** Reel ma dekhaati vyakti kevi che — AI ne aa j varnan aapiye chie. */
     description: { type: String, trim: true },
 
-    /** Chehro sthir rakhva mate — 1 thi 5 photo. */
     referencePhotos: [{ type: Schema.Types.ObjectId, ref: "MediaAsset" }],
-    /** Mukhya photo — sauthi saaf chehro valo. */
     primaryPhoto: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
+
+    generatedViews: { type: [GeneratedViewSchema], default: [] },
 
     gender: {
       type: String,
@@ -39,17 +89,12 @@ const AvatarSchema = new Schema(
     bodyType: { type: String, trim: true },
     heightNote: { type: String, trim: true },
 
-    /** Reel ma bolvani rit — voiceover ane on-screen text aa pramane bane. */
     persona: { type: String, trim: true, default: "friendly, confident, warm" },
-    /** "en" | "hi" | "gu" | "hinglish" */
     language: { type: String, trim: true, default: "en" },
 
-    /** Kaya prakar na kapda / look ma dekhaay. */
     wardrobeNotes: { type: String, trim: true },
-    /** Kaya jagya e shoot thayelu lage. */
     settingNotes: { type: String, trim: true },
 
-    /** Ek brand ma ek j default avatar. */
     isDefault: { type: Boolean, default: false, index: true },
     active: { type: Boolean, default: true, index: true },
 
@@ -60,34 +105,12 @@ const AvatarSchema = new Schema(
 
 AvatarSchema.index({ brand: 1, name: 1 }, { unique: true });
 
+export const Avatar = model<AvatarDoc>("Avatar", AvatarSchema);
+
 /**
- * Avatar ne ek prompt-line ma badle — dareak image generation ma aa j
- * lakhan jaay che, etle chehro/look badha scenes ma sarkho rahe.
+ * Turns an avatar into a single prompt line. The same wording goes into every
+ * image request, which is what keeps the face and the look consistent.
  */
-AvatarSchema.methods.toPromptDescription = function toPromptDescription(): string {
-  const doc = this as AvatarDoc;
-  return [
-    doc.description,
-    doc.gender !== "unspecified" ? `${doc.gender}` : "",
-    doc.ageRange ? `around ${doc.ageRange} years old` : "",
-    doc.skinTone ? `${doc.skinTone} skin` : "",
-    doc.hair ? `${doc.hair} hair` : "",
-    doc.bodyType ? `${doc.bodyType} build` : "",
-  ]
-    .filter(Boolean)
-    .join(", ");
-};
-
-export type AvatarDoc = InferSchemaType<typeof AvatarSchema> & {
-  _id: mongoose.Types.ObjectId;
-  toPromptDescription(): string;
-};
-
-export const Avatar: Model<AvatarDoc> =
-  (mongoose.models.Avatar as Model<AvatarDoc>) ||
-  mongoose.model<AvatarDoc>("Avatar", AvatarSchema);
-
-/** Model method na hoy tya pan vaparvva mate — plain object par pan chale. */
 export function avatarPromptDescription(
   avatar: Partial<AvatarDoc> | null | undefined,
 ): string {

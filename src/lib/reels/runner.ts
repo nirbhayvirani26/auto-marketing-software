@@ -1,14 +1,15 @@
 /**
- * Reel job ne background ma chalavvanu.
+ * Runs reel jobs in the background.
  *
- * Ek reel banta 1 thi 5 minute lage che (AI + render). Etle HTTP request
- * ma raah jovay nahi — browser ke proxy vachhe j timeout kari de. Etle:
+ * A reel takes one to five minutes to build (AI plus rendering), which is far
+ * longer than an HTTP request can wait — the browser or a proxy would time out
+ * first. So the work is detached:
  *
- *   POST /api/studio/generate  → jobId turant pacho male
- *   GET  /api/studio/jobs/:id  → dar 3 second e progress puchtaa raho
+ *   POST /api/studio/generate  -> returns a jobId immediately
+ *   GET  /api/studio/jobs/:id  -> poll every few seconds for progress
  *
- * Ek j vakhate ketla reel banse e limit rakhi che, nahi to ffmpeg aakhu
- * CPU khai jaay ane server dhimo padi jaay.
+ * The number of reels rendering at once is capped, otherwise ffmpeg takes the
+ * whole CPU and the server crawls.
  */
 
 import { connectDB } from "@/lib/db";
@@ -34,16 +35,30 @@ function maxConcurrent(): number {
   return Math.max(1, Number(process.env.REEL_MAX_CONCURRENT || 2));
 }
 
-/** Job atki gayo ganvano samay — aa pachi retry thai shake. */
+/** After this long a job counts as stuck and may be retried. */
 const STUCK_AFTER_MS = 25 * 60_000;
 
 /**
- * Job banavo ane background ma chalu karo. jobId turant pacho male che.
+ * The pipeline, in order. Every job starts with all of these pending and the
+ * Studio page renders them as a progress list.
  */
+const REEL_STEPS = [
+  { key: "vision", label: "Understanding the image" },
+  { key: "trends", label: "Finding trending keywords" },
+  { key: "plan", label: "Writing the reel script" },
+  { key: "media", label: "Preparing the scene images" },
+  { key: "music", label: "Choosing the music" },
+  { key: "render", label: "Rendering the video" },
+  { key: "upload", label: "Publishing to a public URL" },
+  { key: "copy", label: "Writing captions and hashtags" },
+  { key: "distribute", label: "Posting automatically" },
+] as const;
+
+/** Creates a job and starts it in the background; the jobId comes back at once. */
 export type StartReelJobOptions = {
   /**
-   * Reel taiyar thay ke turant jate j publish kari devu.
-   * Automation aa vaapre che — cron ma 4 minute raah na jovay.
+   * Publish as soon as the reel is ready. Automations rely on this, because
+   * the scheduler cannot sit and wait four minutes for a render.
    */
   autoDistribute?: {
     accountIds?: string[];
@@ -81,19 +96,9 @@ export async function startReelJob(
     tone: input.tone,
     status: "queued",
     createdBy: input.createdBy,
-    steps: [
-      { key: "vision", label: "Image samajie chie", status: "pending" },
-      { key: "trends", label: "Trending keywords shodhie chie", status: "pending" },
-      { key: "plan", label: "Reel no script lakhie chie", status: "pending" },
-      { key: "media", label: "Scene ni images taiyar karie chie", status: "pending" },
-      { key: "music", label: "Music pasand karie chie", status: "pending" },
-      { key: "render", label: "Video render karie chie", status: "pending" },
-      { key: "upload", label: "Public URL banavie chie", status: "pending" },
-      { key: "copy", label: "Caption ane hashtags lakhie chie", status: "pending" },
-      ...(options.autoDistribute
-        ? [{ key: "distribute", label: "Jate publish karie chie", status: "pending" }]
-        : []),
-    ],
+    steps: REEL_STEPS.filter(
+      (step) => step.key !== "distribute" || Boolean(options.autoDistribute),
+    ).map((step) => ({ ...step, status: "pending" as const })),
   });
 
   const withJobId: GenerateReelInput = { ...input, jobId: String(job._id) };

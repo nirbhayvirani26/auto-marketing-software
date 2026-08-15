@@ -47,7 +47,7 @@ export default function LogsPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Activity Logs"
-        subtitle="Dareak publish, AI generation, automation run ane n8n event ahiya nondhay che"
+        subtitle="Every publish, AI generation, automation run and n8n event is recorded here."
         action={
           <Button variant="outlined" startIcon={<RefreshIcon />} onClick={load}>
             Refresh
@@ -89,7 +89,7 @@ export default function LogsPage() {
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Koi log nathi.
+                      Nothing has been logged yet.
                     </Typography>
                   </TableCell>
                 </TableRow>

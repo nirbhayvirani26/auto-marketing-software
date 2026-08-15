@@ -7,12 +7,14 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   Grid,
   IconButton,
   MenuItem,
@@ -25,6 +27,7 @@ import DeleteIcon from "@mui/icons-material/DeleteOutline";
 import StarIcon from "@mui/icons-material/StarRounded";
 import StarBorderIcon from "@mui/icons-material/StarBorderRounded";
 import PersonAddIcon from "@mui/icons-material/PersonAddAlt1Outlined";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 
 import PageHeader from "@/components/PageHeader";
 import { apiFetch } from "@/lib/client";
@@ -44,12 +47,26 @@ type Avatar = {
   isDefault?: boolean;
   photoUrls: string[];
   primaryPhotoUrl?: string | null;
+  generatedViews?: Array<{ key: string; label: string; url: string }>;
 };
+
+type ViewOption = { key: string; label: string; purpose: string };
+type GeneratedView = { key: string; label: string; purpose?: string; url: string };
 
 type Uploaded = { id: string; previewUrl: string; filename: string };
 
 export default function AvatarsPage() {
   const [avatars, setAvatars] = React.useState<Avatar[]>([]);
+
+  // --- generated views ---
+  const [viewsFor, setViewsFor] = React.useState<Avatar | null>(null);
+  const [viewOptions, setViewOptions] = React.useState<ViewOption[]>([]);
+  const [generated, setGenerated] = React.useState<GeneratedView[]>([]);
+  const [pickedViews, setPickedViews] = React.useState<string[]>([]);
+  const [direction, setDirection] = React.useState("");
+  const [generating, setGenerating] = React.useState(false);
+  const [viewError, setViewError] = React.useState<string | null>(null);
+  const [viewNotice, setViewNotice] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [open, setOpen] = React.useState(false);
@@ -101,7 +118,7 @@ export default function AvatarsPage() {
 
   async function save() {
     if (!form.name || photos.length === 0) {
-      setError("Naam ane ochho ek photo joiye");
+      setError("A name and at least one photo are required.");
       return;
     }
     setSaving(true);
@@ -121,7 +138,7 @@ export default function AvatarsPage() {
 
       setNotice(
         res.describeError
-          ? `Avatar banyo, pan AI varnan na kadhi shakyu (${res.describeError}) — jate lakhi shako cho.`
+          ? `The avatar was created, but the AI could not describe it (${res.describeError}) — you can write the description yourself.`
           : "Avatar banyo — have reels ma aa chehro dekhashe",
       );
       setOpen(false);
@@ -153,7 +170,7 @@ export default function AvatarsPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Aa avatar kaadhi naakhvo che?")) return;
+    if (!confirm("Delete this avatar?")) return;
     try {
       await apiFetch(`/api/avatars?id=${id}`, { method: "DELETE" });
       load();
@@ -162,11 +179,70 @@ export default function AvatarsPage() {
     }
   }
 
+  /* ---- Generated views ---- */
+
+  async function openViews(avatar: Avatar) {
+    setViewsFor(avatar);
+    setViewError(null);
+    setViewNotice(null);
+    setDirection("");
+    setGenerated([]);
+    setPickedViews([]);
+    try {
+      const data = await apiFetch<{ available: ViewOption[]; generated: GeneratedView[] }>(
+        `/api/avatars/${avatar._id}/views`,
+      );
+      setViewOptions(data.available);
+      setGenerated(data.generated);
+      // Default to everything that has not been made yet.
+      const done = new Set(data.generated.map((view) => view.key));
+      setPickedViews(data.available.filter((v) => !done.has(v.key)).map((v) => v.key));
+    } catch (problem) {
+      setViewError((problem as Error).message);
+    }
+  }
+
+  async function generateViews() {
+    if (!viewsFor || pickedViews.length === 0) return;
+    setGenerating(true);
+    setViewError(null);
+    setViewNotice(null);
+    try {
+      const result = await apiFetch<{
+        created: Array<{ key: string; label: string; url: string }>;
+        failed: Array<{ label: string; reason: string }>;
+      }>(`/api/avatars/${viewsFor._id}/views`, {
+        method: "POST",
+        json: { views: pickedViews, direction: direction || undefined },
+      });
+
+      setViewNotice(
+        `${result.created.length} view(s) generated${
+          result.failed.length ? `, ${result.failed.length} failed` : ""
+        }.`,
+      );
+      if (result.failed.length) {
+        setViewError(result.failed.map((f) => `${f.label}: ${f.reason}`).join("\n"));
+      }
+
+      const fresh = await apiFetch<{ generated: GeneratedView[] }>(
+        `/api/avatars/${viewsFor._id}/views`,
+      );
+      setGenerated(fresh.generated);
+      setPickedViews([]);
+      load();
+    } catch (problem) {
+      setViewError((problem as Error).message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   return (
     <Stack spacing={3}>
       <PageHeader
         title="Avatars"
-        subtitle="Tamaro potano chehro reels ma — ek j vaar photo aapo, pachi dareak reel ma e j vyakti dekhashe"
+        subtitle="Give the reels a face. Upload photos once and the same person appears in every reel you make."
       />
 
       {error && (
@@ -182,16 +258,17 @@ export default function AvatarsPage() {
 
       <Alert severity="info">
         <Typography variant="body2">
-          Avatar etle reel ma dekhaati vyakti — tame, tamaro model, ke AI e
-          banavelo chehro. Ek vaar 2-3 saaf photo aapo (samu joto chehro, alag
-          alag angle), pachi AI dareak reel ma e j chehro ane e j look rakhse.
-          Product apparel hoy to avatar e product <strong>pehri ne</strong> dekhashe.
+          An avatar is the person who appears in your reels — you, your model,
+          or an AI-generated face. Upload two or three clear photos once (facing
+          the camera, from a few angles) and the same face and look are kept in
+          every reel.
+          When the product is clothing, the avatar is shown <strong>wearing</strong> it.
         </Typography>
       </Alert>
 
       <Box>
         <Button variant="contained" startIcon={<PersonAddIcon />} onClick={() => setOpen(true)}>
-          Navo avatar banavo
+          New avatar
         </Button>
       </Box>
 
@@ -201,8 +278,8 @@ export default function AvatarsPage() {
             <Card>
               <CardContent sx={{ textAlign: "center", py: 6 }}>
                 <Typography variant="body2" color="text.secondary">
-                  Have sudhi koi avatar nathi. Avatar vagar pan reels bane che —
-                  fakt product ni image thi.
+                  No avatars yet. Reels work without one too — built from your
+                  product photos alone.
                 </Typography>
               </CardContent>
             </Card>
@@ -255,15 +332,28 @@ export default function AvatarsPage() {
                 <Typography variant="body2" color="text.secondary">
                   {(avatar.description ?? "").slice(0, 160)}
                 </Typography>
+
+                <Button
+                  fullWidth
+                  size="small"
+                  variant="outlined"
+                  startIcon={<AutoAwesomeIcon />}
+                  sx={{ mt: 2 }}
+                  onClick={() => openViews(avatar)}
+                >
+                  {avatar.generatedViews?.length
+                    ? `Views (${avatar.generatedViews.length})`
+                    : "Generate views"}
+                </Button>
               </CardContent>
             </Card>
           </Grid>
         ))}
       </Grid>
 
-      {/* ---- Navo avatar ---- */}
+      {/* ---- New avatar ---- */}
       <Dialog open={open} onClose={() => !saving && setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Navo avatar</DialogTitle>
+        <DialogTitle>New avatar</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <input
@@ -293,7 +383,7 @@ export default function AvatarsPage() {
                 <>
                   <AddPhotoIcon color="primary" sx={{ fontSize: 32 }} />
                   <Typography variant="body2" sx={{ mt: 1 }}>
-                    2-3 photo mukho (chehro saaf dekhato hoy)
+                    Upload 2-3 photos with the face clearly visible
                   </Typography>
                 </>
               )}
@@ -340,7 +430,7 @@ export default function AvatarsPage() {
                 size="small"
                 fullWidth
               >
-                <MenuItem value="unspecified">Kaho nahi</MenuItem>
+                <MenuItem value="unspecified">Prefer not to say</MenuItem>
                 <MenuItem value="female">Female</MenuItem>
                 <MenuItem value="male">Male</MenuItem>
                 <MenuItem value="non-binary">Non-binary</MenuItem>
@@ -396,7 +486,119 @@ export default function AvatarsPage() {
             disabled={saving || !form.name || photos.length === 0}
             startIcon={saving ? <CircularProgress size={16} /> : undefined}
           >
-            {saving ? "Save karie chie…" : "Avatar banavo"}
+            {saving ? "Saving…" : "Create avatar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ---- Generated views ---- */}
+      <Dialog
+        open={Boolean(viewsFor)}
+        onClose={() => !generating && setViewsFor(null)}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>{viewsFor?.name} — generated views</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Alert severity="info">
+              Every view is generated from this avatar&apos;s reference photos, so
+              it stays the same person. Use them for full-body try-on shots, side
+              and back angles, and close-ups when a scene needs a face.
+            </Alert>
+
+            {viewError && (
+              <Alert severity="error" sx={{ whiteSpace: "pre-line" }} onClose={() => setViewError(null)}>
+                {viewError}
+              </Alert>
+            )}
+            {viewNotice && (
+              <Alert severity="success" onClose={() => setViewNotice(null)}>
+                {viewNotice}
+              </Alert>
+            )}
+
+            {generated.length > 0 && (
+              <>
+                <Typography variant="subtitle2">Already generated</Typography>
+                <Grid container spacing={1}>
+                  {generated.map((view) => (
+                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={view.key}>
+                      <Box
+                        component="img"
+                        src={view.url}
+                        alt={view.label}
+                        sx={{
+                          width: "100%",
+                          aspectRatio: "3/4",
+                          objectFit: "cover",
+                          borderRadius: 2,
+                          bgcolor: "action.hover",
+                        }}
+                      />
+                      <Typography variant="caption" display="block" noWrap>
+                        {view.label}
+                      </Typography>
+                    </Grid>
+                  ))}
+                </Grid>
+              </>
+            )}
+
+            <Typography variant="subtitle2">Generate</Typography>
+            <Stack>
+              {viewOptions.map((option) => (
+                <FormControlLabel
+                  key={option.key}
+                  control={
+                    <Checkbox
+                      checked={pickedViews.includes(option.key)}
+                      onChange={(event) =>
+                        setPickedViews((current) =>
+                          event.target.checked
+                            ? [...current, option.key]
+                            : current.filter((key) => key !== option.key),
+                        )
+                      }
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2">{option.label}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {option.purpose}
+                      </Typography>
+                    </Box>
+                  }
+                />
+              ))}
+            </Stack>
+
+            <TextField
+              label="Extra direction (optional)"
+              value={direction}
+              onChange={(event) => setDirection(event.target.value)}
+              placeholder="e.g. wearing a navy saree, outdoors in daylight"
+              fullWidth
+            />
+
+            <Typography variant="caption" color="text.secondary">
+              This needs an image model that reads reference photos — Nano Banana
+              (GEMINI_API_KEY) or gpt-image-1. Each view takes a few seconds.
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewsFor(null)} disabled={generating}>
+            Close
+          </Button>
+          <Button
+            variant="contained"
+            onClick={generateViews}
+            disabled={generating || pickedViews.length === 0}
+            startIcon={generating ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}
+          >
+            {generating ? "Generating…" : `Generate ${pickedViews.length} view(s)`}
           </Button>
         </DialogActions>
       </Dialog>

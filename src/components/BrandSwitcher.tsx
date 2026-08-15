@@ -32,8 +32,8 @@ export type BrandSummary = {
 };
 
 /**
- * Topbar ma brand switcher. Brand badlo etle badhu data — accounts, posts,
- * campaigns, DM rules — e brand nu dekhaay che.
+ * The brand switcher in the top bar. Changing the brand changes everything
+ * below it — accounts, posts, campaigns and DM rules all follow.
  */
 export default function BrandSwitcher() {
   const router = useRouter();
@@ -72,7 +72,7 @@ export default function BrandSwitcher() {
       });
       setActiveId(id);
       setAnchorEl(null);
-      // Server components ane badha lists fari load thay.
+      // Reload so every server component and list picks up the new brand.
       router.refresh();
       window.location.reload();
     } finally {
@@ -89,7 +89,7 @@ export default function BrandSwitcher() {
         variant="outlined"
         startIcon={<AddIcon />}
       >
-        Brand banavo
+        Create a brand
       </Button>
     );
   }
@@ -179,7 +179,7 @@ export default function BrandSwitcher() {
           <ListItemIcon>
             <SettingsIcon fontSize="small" />
           </ListItemIcon>
-          Brands manage karo
+          Manage brands
         </MenuItem>
       </Menu>
     </>

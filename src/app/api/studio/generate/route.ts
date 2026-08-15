@@ -25,10 +25,10 @@ const schema = z.object({
 });
 
 /**
- * Reel banavvanu shuru karo.
+ * Starts building a reel.
  *
- * Aa route TURANT pacho aave che — reel background ma bane che.
- * Progress mate `GET /api/studio/jobs/<jobId>` par poll karo.
+ * This route returns IMMEDIATELY — the reel is built in the background.
+ * Poll `GET /api/studio/jobs/<jobId>` for progress.
  */
 export const POST = handle(async (request) => {
   const ctx = await requireBrand();
@@ -62,7 +62,7 @@ export const POST = handle(async (request) => {
       brand: ctx.brandId,
       kind: "video",
     });
-    if (!reference) return fail("Reference video madyu nahi", 422);
+    if (!reference) return fail("Reference video not found", 422);
   }
 
   const { jobId, queued } = await startReelJob({
@@ -73,7 +73,7 @@ export const POST = handle(async (request) => {
 
   await logActivity({
     action: "reel.queued",
-    message: `Reel banavvanu shuru — ${body.imageAssetIds.length} image, ${body.targetDuration ?? 40}s`,
+    message: `Reel started — ${body.imageAssetIds.length} photo(s), ${body.targetDuration ?? 40}s`,
     actor: ctx.session.email,
     meta: { jobId },
   });
@@ -85,8 +85,8 @@ export const POST = handle(async (request) => {
       runner: runnerStatus(),
       pollUrl: `/api/studio/jobs/${jobId}`,
       message: queued
-        ? "Line ma mukayu — thodi var ma shuru thashe"
-        : "Reel banavvanu shuru thai gayu",
+        ? "Queued — it will start shortly"
+        : "Your reel has started building",
     },
     202,
   );

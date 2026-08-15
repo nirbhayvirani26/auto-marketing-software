@@ -1,13 +1,59 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { model, ObjectId, Schema, type BaseFields } from "@/lib/localdb";
+import type { LimitKey, ModuleKey } from "./Plan";
 
 /**
- * Organization = ek customer (tenant). Ena andar brands, ane brands andar
- * accounts/posts/automations aave che.
+ * An organization is one customer (a tenant). Brands live inside it, and
+ * accounts, posts and automations live inside brands:
  *
- *   Organization → Brand → SocialAccount / Post / Campaign / Automation
+ *   Organization -> Brand -> SocialAccount / Post / Campaign / Automation
  *
- * Super admin badhi organizations joi ane manage kari shake che.
+ * The super admin can see and manage every organization.
  */
+export type OrganizationDoc = BaseFields & {
+  name: string;
+  slug: string;
+  owner: ObjectId;
+  plan: ObjectId;
+  status: "trial" | "active" | "past_due" | "suspended" | "cancelled";
+  trialEndsAt?: Date;
+  subscriptionEndsAt?: Date;
+
+  /**
+   * Per-organization module override. A missing key means "use whatever the
+   * plan says". The super admin can switch one module on or off for a single
+   * organization from here.
+   */
+  moduleOverrides?: Partial<Record<ModuleKey, boolean>>;
+  /** Per-organization limit override, same rules as above. */
+  limitOverrides?: Partial<Record<LimitKey, number>>;
+
+  /**
+   * An organization may supply its own API keys. When it does not, the
+   * platform's keys are used instead.
+   */
+  useOwnKeys: boolean;
+  credentials?: {
+    anthropicApiKey?: string;
+    anthropicModel?: string;
+    metaAppId?: string;
+    metaAppSecret?: string;
+    n8nWebhookUrl?: string;
+    n8nWebhookSecret?: string;
+  };
+
+  /** Usage counters, checked against the plan's monthly limits. */
+  usage: {
+    postsThisMonth: number;
+    periodStart: Date;
+  };
+
+  // White-label
+  logoUrl?: string;
+  primaryColor: string;
+
+  notes?: string;
+};
+
 const OrganizationSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -25,26 +71,9 @@ const OrganizationSchema = new Schema(
     trialEndsAt: { type: Date },
     subscriptionEndsAt: { type: Date },
 
-    /**
-     * Per-organization module override. `null` = plan nu j value vaparo.
-     * Super admin ahiya thi ek j organization mate module on/off kari shake.
-     */
-    moduleOverrides: {
-      type: Map,
-      of: Boolean,
-      default: undefined,
-    },
-    /** Per-organization limit override. `null` = plan nu value. */
-    limitOverrides: {
-      type: Map,
-      of: Number,
-      default: undefined,
-    },
+    moduleOverrides: { type: Schema.Types.Mixed },
+    limitOverrides: { type: Schema.Types.Mixed },
 
-    /**
-     * Organization potani API keys aapi shake. Na aape to platform (super
-     * admin) ni keys vaparay che — `useOwnKeys` false hoy tyare.
-     */
     useOwnKeys: { type: Boolean, default: false },
     credentials: {
       anthropicApiKey: { type: String, select: false },
@@ -55,13 +84,11 @@ const OrganizationSchema = new Schema(
       n8nWebhookSecret: { type: String, select: false },
     },
 
-    // Usage counters — postsPerMonth limit check karva mate
     usage: {
       postsThisMonth: { type: Number, default: 0 },
       periodStart: { type: Date, default: () => new Date() },
     },
 
-    // White-label
     logoUrl: { type: String, trim: true },
     primaryColor: { type: String, default: "#5B5BD6" },
 
@@ -70,10 +97,4 @@ const OrganizationSchema = new Schema(
   { timestamps: true },
 );
 
-export type OrganizationDoc = InferSchemaType<typeof OrganizationSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
-
-export const Organization: Model<OrganizationDoc> =
-  (mongoose.models.Organization as Model<OrganizationDoc>) ||
-  mongoose.model<OrganizationDoc>("Organization", OrganizationSchema);
+export const Organization = model<OrganizationDoc>("Organization", OrganizationSchema);

@@ -1,64 +1,160 @@
-import mongoose, {
+import {
+  model,
+  ObjectId,
   Schema,
+  type BaseFields,
   type HydratedDocument,
-  type InferSchemaType,
-  type Model,
-} from "mongoose";
+} from "@/lib/localdb";
 
 /**
- * Ek reel banavva no aakho hisab.
+ * The complete record of building one reel.
  *
- * Reel banavva ma 30 second thi 5 minute lage che (vision → trends →
- * script → images → render → upload). Etle e kaam background ma chale che
- * ane aa document ma dareak step no hisab rahe che — jethi UI ma
- * "atyare su thai rahyu che" batavi shakay ane fail thay to KYA fail thayu
- * e khabar pade.
+ * A reel takes anywhere from thirty seconds to five minutes (vision -> trends
+ * -> script -> images -> render -> upload), so the work runs in the background
+ * and every step is written down here. That is what lets the UI show what is
+ * happening right now, and lets you see exactly *where* something failed.
  */
-const StepSchema = new Schema(
-  {
-    key: { type: String, required: true },
-    label: { type: String, required: true },
-    status: {
-      type: String,
-      enum: ["pending", "running", "done", "failed", "skipped"],
-      default: "pending",
-    },
-    /** Kayo provider chalyo (fallback thayu ke nahi e khabar pade). */
-    provider: { type: String, trim: true },
-    ms: { type: Number },
-    error: { type: String },
-    note: { type: String },
-  },
-  { _id: false },
-);
 
-const SceneSchema = new Schema(
-  {
-    index: { type: Number, required: true },
-    /** "hook" | "product" | "detail" | "benefit" | "proof" | "cta" */
-    purpose: { type: String, trim: true },
-    duration: { type: Number, required: true },
-    motion: { type: String, trim: true },
-    transition: { type: String, trim: true },
-    /** Screen par dekhato text. */
-    onScreenText: { type: String, trim: true },
-    /** Voiceover mate bolvanu vakya. */
-    voiceLine: { type: String, trim: true },
-    /** Kai image vaparai — upload kareli ke AI e banaveli. */
-    media: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
-    imagePrompt: { type: String, trim: true },
-    imageSource: {
-      type: String,
-      enum: ["uploaded", "generated", "tryon", "reference"],
-      default: "uploaded",
-    },
-    /** Still image halavi ke AI e kharekhar video banavyu (Omni). */
-    mediaKind: { type: String, enum: ["image", "video"], default: "image" },
-    /** Video hoy to — Omni ne su halavvanu kahyu hatu. */
-    videoPrompt: { type: String, trim: true },
+export type ReelStep = {
+  key: string;
+  label: string;
+  status: "pending" | "running" | "done" | "failed" | "skipped";
+  /** Which provider ran, so a fallback is visible after the fact. */
+  provider?: string;
+  ms?: number;
+  error?: string;
+  note?: string;
+};
+
+export type ReelScene = {
+  index: number;
+  /** "hook" | "product" | "detail" | "benefit" | "proof" | "cta" */
+  purpose?: string;
+  duration: number;
+  motion?: string;
+  transition?: string;
+  /** Text burned onto the screen. */
+  onScreenText?: string;
+  /** The line spoken by the voiceover. */
+  voiceLine?: string;
+  /** The image used — uploaded or AI-generated. */
+  media?: ObjectId;
+  imagePrompt?: string;
+  imageSource: "uploaded" | "generated" | "tryon" | "reference";
+  /** Whether the scene is a moving still or a real generated video clip. */
+  mediaKind: "image" | "video";
+  /** For a video scene — what the video model was told to animate. */
+  videoPrompt?: string;
+};
+
+export type ReelJobDoc = BaseFields & {
+  brand: ObjectId;
+  avatar?: ObjectId;
+  product?: ObjectId;
+
+  /** The original images the user uploaded. */
+  sourceImages: ObjectId[];
+  /** "Make one like this" — a reference video. */
+  referenceVideo?: ObjectId;
+  referenceUrl?: string;
+
+  /**
+   * single    — one product
+   * multi     — several products in one reel
+   * tryon     — the avatar wearing the product
+   * reference — in the style of a supplied reel
+   */
+  mode: "single" | "multi" | "tryon" | "reference";
+
+  targetDuration: number;
+  language: string;
+  tone?: string;
+
+  status: "queued" | "running" | "done" | "failed" | "canceled";
+  steps: ReelStep[];
+  scenes: ReelScene[];
+
+  /** Everything the vision pass understood about the product. */
+  analysis?: unknown;
+  /** Trending keywords and hashtags. */
+  trends?: unknown;
+  /** Per-platform captions. */
+  copy?: unknown;
+  /** The track used, plus the trending-audio suggestion for Instagram. */
+  audio?: unknown;
+
+  /** The finished reel and its cover. */
+  output?: ObjectId;
+  thumbnail?: ObjectId;
+  duration?: number;
+
+  /** Posts created from this reel. */
+  posts: ObjectId[];
+
+  /**
+   * Publish automatically the moment the reel is ready.
+   *
+   * This is what "set it and forget it" automation uses: a reel takes minutes
+   * to build, so the scheduler cannot wait for it. The background worker picks
+   * this up when the work finishes and publishes on its own.
+   */
+  autoDistribute: {
+    enabled: boolean;
+    accountIds: string[];
+    when: "now" | "auto" | "draft";
+    hashtagsInFirstComment: boolean;
+    /** Which automation created this, for logs and debugging. */
+    automation?: ObjectId;
+    result?: unknown;
+    error?: string;
+  };
+
+  /** Non-fatal problems worth telling the seller about. */
+  warnings: string[];
+
+  error?: string;
+  startedAt?: Date;
+  finishedAt?: Date;
+  ms?: number;
+
+  createdBy?: ObjectId;
+};
+
+/** A live document, with `save()` attached. */
+export type ReelJobDocument = HydratedDocument<ReelJobDoc>;
+
+const StepSchema = new Schema({
+  key: { type: String, required: true },
+  label: { type: String, required: true },
+  status: {
+    type: String,
+    enum: ["pending", "running", "done", "failed", "skipped"],
+    default: "pending",
   },
-  { _id: false },
-);
+  provider: { type: String, trim: true },
+  ms: { type: Number },
+  error: { type: String },
+  note: { type: String },
+});
+
+const SceneSchema = new Schema({
+  index: { type: Number, required: true },
+  purpose: { type: String, trim: true },
+  duration: { type: Number, required: true },
+  motion: { type: String, trim: true },
+  transition: { type: String, trim: true },
+  onScreenText: { type: String, trim: true },
+  voiceLine: { type: String, trim: true },
+  media: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
+  imagePrompt: { type: String, trim: true },
+  imageSource: {
+    type: String,
+    enum: ["uploaded", "generated", "tryon", "reference"],
+    default: "uploaded",
+  },
+  mediaKind: { type: String, enum: ["image", "video"], default: "image" },
+  videoPrompt: { type: String, trim: true },
+});
 
 const ReelJobSchema = new Schema(
   {
@@ -66,18 +162,10 @@ const ReelJobSchema = new Schema(
     avatar: { type: Schema.Types.ObjectId, ref: "Avatar" },
     product: { type: Schema.Types.ObjectId, ref: "Product" },
 
-    /** User e upload kareli original images. */
     sourceImages: [{ type: Schema.Types.ObjectId, ref: "MediaAsset" }],
-    /** "aa jevi reel banavo" — reference video. */
     referenceVideo: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
     referenceUrl: { type: String, trim: true },
 
-    /**
-     * single   — ek product ni reel
-     * multi    — ghana product ni ek j reel (collection)
-     * tryon    — avatar potane product pehri ne
-     * reference— aapelі reel ni style ma
-     */
     mode: {
       type: String,
       enum: ["single", "multi", "tryon", "reference"],
@@ -98,29 +186,17 @@ const ReelJobSchema = new Schema(
     steps: { type: [StepSchema], default: [] },
     scenes: { type: [SceneSchema], default: [] },
 
-    /** Vision e su samjyu — aakhu object jem che em. */
     analysis: { type: Schema.Types.Mixed },
-    /** Trending keywords + hashtags. */
     trends: { type: Schema.Types.Mixed },
-    /** Platform dith caption. */
     copy: { type: Schema.Types.Mixed },
-    /** Kayu music vaparyu + IG trending audio suchav. */
     audio: { type: Schema.Types.Mixed },
 
-    /** Final reel ane ena cover. */
     output: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
     thumbnail: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
     duration: { type: Number },
 
-    /** Aa reel mathi banela posts. */
     posts: [{ type: Schema.Types.ObjectId, ref: "Post" }],
 
-    /**
-     * Reel taiyar thay ke turant jate j publish kari devu?
-     * Automation ("set karo ane bhuli jao") aa vaapre che — reel banta
-     * 2-4 minute lage che, etle cron ma raah na jovay; kaam pura thay tyare
-     * background worker j aa joine post kari de che.
-     */
     autoDistribute: {
       enabled: { type: Boolean, default: false },
       accountIds: { type: [String], default: [] },
@@ -130,11 +206,12 @@ const ReelJobSchema = new Schema(
         default: "now",
       },
       hashtagsInFirstComment: { type: Boolean, default: true },
-      /** Kayu automation e banavyu — log ane debugging mate. */
       automation: { type: Schema.Types.ObjectId, ref: "Automation" },
       result: { type: Schema.Types.Mixed },
       error: { type: String },
     },
+
+    warnings: { type: [String], default: [] },
 
     error: { type: String },
     startedAt: { type: Date },
@@ -148,24 +225,15 @@ const ReelJobSchema = new Schema(
 
 ReelJobSchema.index({ brand: 1, status: 1, createdAt: -1 });
 
-export type ReelJobDoc = InferSchemaType<typeof ReelJobSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
+export const ReelJob = model<ReelJobDoc>("ReelJob", ReelJobSchema);
 
-/** DB mathi aavelu jivant document — `.save()` jevi methods sathe. */
-export type ReelJobDocument = HydratedDocument<ReelJobDoc>;
-
-export const ReelJob: Model<ReelJobDoc> =
-  (mongoose.models.ReelJob as Model<ReelJobDoc>) ||
-  mongoose.model<ReelJobDoc>("ReelJob", ReelJobSchema);
-
-/** Step ne update karvanu — job document ma sidhu lakhe che. */
+/** Records progress for one step, straight onto the job document. */
 export async function setStep(
-  jobId: mongoose.Types.ObjectId | string,
+  jobId: ObjectId | string,
   key: string,
   patch: {
     label?: string;
-    status?: "pending" | "running" | "done" | "failed" | "skipped";
+    status?: ReelStep["status"];
     provider?: string;
     ms?: number;
     error?: string;
@@ -175,7 +243,7 @@ export async function setStep(
   const job = await ReelJob.findById(jobId);
   if (!job) return;
 
-  const existing = job.steps.find((s) => s.key === key);
+  const existing = job.steps.find((step) => step.key === key);
   if (existing) {
     Object.assign(existing, patch);
   } else {
@@ -184,7 +252,7 @@ export async function setStep(
       label: patch.label ?? key,
       status: patch.status ?? "pending",
       ...patch,
-    } as never);
+    });
   }
   await job.save();
 }

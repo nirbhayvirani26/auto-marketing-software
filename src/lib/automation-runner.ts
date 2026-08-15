@@ -134,7 +134,7 @@ export async function runAutomation(
 
   const automation = await Automation.findById(automationId);
   if (!automation) {
-    result.errors.push("Automation madyu nahi");
+    result.errors.push("Automation not found");
     return result;
   }
 
@@ -180,8 +180,8 @@ export async function runAutomation(
       level: result.errors.length ? "warning" : "success",
       action: "automation.run",
       message: result.errors.length
-        ? `"${automation.name}" — reel shuru na thai shakyu`
-        : `"${automation.name}" — reel banavvanu shuru thayu (${result.created} image)`,
+        ? `"${automation.name}" — the reel could not be started`
+        : `"${automation.name}" — reel started (${result.created} photo(s))`,
       automation: automation._id,
       meta: result,
     });

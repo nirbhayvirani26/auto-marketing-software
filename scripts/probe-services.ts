@@ -1,13 +1,13 @@
 /**
- * Bahar ni badhi service ne EK NANI SACHI request mokle che.
+ * Sends ONE SMALL REAL REQUEST to every external service.
  *
  *   npm run test:services
  *
- * "Key set che" ane "key kaam kare che" — e be alag vaat che. Dakhla
- * tarike key barabar hoy pan credit khatam hoy, ke free limit lagi hoy.
- * Aa script e j pakde che, ane su karvu e pan kahe che.
+ * "The key is set" and "the key works" are two different things. A key can be
+ * perfectly valid while the account is out of credit or the free quota is
+ * spent. This is the script that catches that, and tells you what to do.
  *
- * (Aa j test admin panel ma Setup page par button tarike pan che.)
+ * The same checks are available as a button on the Setup page.
  */
 
 import path from "node:path";
@@ -58,7 +58,7 @@ async function step(
 
 async function main() {
   console.log("\n╔══════════════════════════════════════════════════════════╗");
-  console.log("║  Badhi service kharekhar chale che ke nahi               ║");
+  console.log("║  Does every service actually work?                       ║");
   console.log("╚══════════════════════════════════════════════════════════╝\n");
 
   const image = await sharp({
@@ -67,26 +67,26 @@ async function main() {
     .jpeg()
     .toBuffer();
 
-  /* ---- MongoDB ---- */
-  // Aa sauthi pehla — DB band hoy to bija ghana test khota karan sathe
-  // fail thay che ane user gothvai jaay che.
+  /* ---- Local database ---- */
+  // First, because when storage is broken almost everything else fails for
+  // confusing secondary reasons.
   await step(
-    "MongoDB",
+    "Local database",
     true,
-    "`npm run mongo` chalavo (bija terminal ma), ke .env ma MONGODB_URI barabar karo.",
+    "Check that the project folder is writable, then run `npm run seed`.",
     async () => {
-      const { connectDB } = await import("../src/lib/db");
+      const { connectDB, databaseLocation } = await import("../src/lib/db");
+      const { User } = await import("../src/models/User");
       await connectDB();
-      const mongoose = (await import("mongoose")).default;
-      if (mongoose.connection.readyState !== 1) throw new Error("connect na thayu");
-      return mongoose.connection.name;
+      const users = await User.countDocuments();
+      return `${databaseLocation()} · ${users} user${users === 1 ? "" : "s"}`;
     },
   );
 
   /* ---- Video engine ---- */
-  await step("Video engine (ffmpeg + font)", true, "`npm install` fari chalavo, pachi `npm run fonts`.", async () => {
+  await step("Video engine (ffmpeg + fonts)", true, "Run `npm install` again, then `npm run fonts`.", async () => {
     const engine = videoEngineStatus();
-    if (!engine.ready) throw new Error(engine.error ?? "ffmpeg madyu nahi");
+    if (!engine.ready) throw new Error(engine.error ?? "ffmpeg was not found");
     return `ok · ${path.basename(resolveFont("latin"))}`;
   });
 
@@ -94,19 +94,19 @@ async function main() {
   const providers = allProviders().filter((p) => p.configured());
   if (providers.length === 0) {
     rows.push({
-      label: "AI lakhan",
+      label: "Text AI",
       required: true,
       ok: false,
-      note: "Ek pan AI key set nathi",
-      fix: "aistudio.google.com/apikey par thi FREE key lo → .env ma GEMINI_API_KEY",
+      note: "No AI key is set",
+      fix: "Get a free key at aistudio.google.com/apikey and set GEMINI_API_KEY in .env",
     });
-    console.log("  ✗ AI lakhan                                ek pan key set nathi");
+    console.log("  ✗ Text AI                                  no key is set");
   } else {
     for (const provider of providers) {
       await step(
-        `AI lakhan — ${provider.key}`,
+        `Text AI — ${provider.key}`,
         false,
-        "Key badlo ke bijo free provider naakho.",
+        "Replace the key, or add another provider. Groq and Ollama are both free.",
         async () => {
           await provider.complete<{ word: string }>({
             system: "Reply with JSON only.",
@@ -126,9 +126,9 @@ async function main() {
 
   /* ---- Vision ---- */
   await step(
-    "AI — image samajvi",
+    "Vision — reading a product photo",
     true,
-    "GEMINI_API_KEY (free) naakho — aistudio.google.com/apikey",
+    "Add a working AI key: Gemini (aistudio.google.com/apikey), Groq (console.groq.com/keys, free), or run Ollama locally.",
     async () => {
       const { provider } = await askVision<{ colour: string }>(
         [{ data: image, mimeType: "image/jpeg" }],
@@ -151,10 +151,10 @@ async function main() {
   await step(
     "Public media hosting",
     true,
-    "CLOUDINARY_CLOUD_NAME + CLOUDINARY_UPLOAD_PRESET (free), ke PUBLIC_MEDIA_BASE_URL. Aa vagar IG/FB par post NAHI thay.",
+    "Set CLOUDINARY_CLOUD_NAME + CLOUDINARY_UPLOAD_PRESET (free) or PUBLIC_MEDIA_BASE_URL. Without one of these nothing can be published to Instagram or Facebook.",
     async () => {
       const base = (process.env.PUBLIC_MEDIA_BASE_URL || "").replace(/\/$/, "");
-      if (base && /^https:\/\//i.test(base)) return `potanu URL: ${base}`;
+      if (base && /^https:\/\//i.test(base)) return `your own URL: ${base}`;
 
       const up = await uploadPublic({
         data: image,
@@ -163,29 +163,29 @@ async function main() {
         kind: "image",
       });
       const check = await fetch(up.data.url, { signal: AbortSignal.timeout(30_000) });
-      if (!check.ok) throw new Error(`URL khulyu nahi (${check.status})`);
-      return `${up.data.host} · bahar thi khule che`;
+      if (!check.ok) throw new Error(`the URL did not open (${check.status})`);
+      return `${up.data.host} · reachable from the internet`;
     },
   );
 
-  /* ---- Trends (key vagar) ---- */
-  await step("Trends — Google Autocomplete", false, "Internet/proxy check karo.", async () => {
+  /* ---- Trends (no key needed) ---- */
+  await step("Trends — Google Autocomplete", false, "Check your internet connection or proxy.", async () => {
     const words = await googleAutocomplete("cotton kurti", process.env.TRENDS_GEO || "IN");
-    if (words.length === 0) throw new Error("koi suggestion na madyu");
-    return `${words.length} keyword`;
+    if (words.length === 0) throw new Error("no suggestions came back");
+    return `${words.length} keywords`;
   });
 
-  await step("Trends — Google Trends", false, "Internet/proxy check karo.", async () => {
+  await step("Trends — Google Trends", false, "Check your internet connection or proxy.", async () => {
     const topics = await googleDailyTrends(process.env.TRENDS_GEO || "IN");
-    if (topics.length === 0) throw new Error("koi topic na madyo");
-    return `${topics.length} topic`;
+    if (topics.length === 0) throw new Error("no topics came back");
+    return `${topics.length} topics`;
   });
 
   /* ---- Image generation ---- */
   await step(
-    "AI image (avatar + kapda)",
+    "Image generation (Nano Banana)",
     false,
-    "GEMINI_API_KEY naakho. Aa vagar pan reel banse — tamari potani image thi.",
+    "Add GEMINI_API_KEY. Reels still render without it, using your own photos.",
     async () => {
       const { data, provider } = await generateImage({
         prompt: "A plain blue ceramic mug on a white table, soft daylight",
@@ -199,12 +199,12 @@ async function main() {
 
   /* ---- Music ---- */
   await step(
-    "Reel nu music",
+    "Music for the reel",
     false,
     "JAMENDO_CLIENT_ID (free) naakho, ke storage/music/ ma mp3 mukho.",
     async () => {
       const picked = await pickMusic({ mood: "upbeat", minDuration: 30 });
-      if (!picked) throw new Error("ek pan track na madyo");
+      if (!picked) throw new Error("no track was found");
       return `${picked.track.source} · "${picked.track.title.slice(0, 30)}"`;
     },
   );
@@ -213,7 +213,7 @@ async function main() {
   await step(
     "Voiceover",
     false,
-    "GEMINI_API_KEY ke ELEVENLABS_API_KEY naakho. Voiceover vagar pan chale che.",
+    "Add GEMINI_API_KEY or ELEVENLABS_API_KEY. Reels work fine without a voiceover.",
     async () => {
       const { data, provider } = await generateVoiceover({ text: "Short voiceover test." });
       return `${provider} · ${(data.data.length / 1024).toFixed(0)} KB`;
@@ -228,14 +228,14 @@ async function main() {
     async () => {
       const appId = process.env.META_APP_ID || "";
       const secret = process.env.META_APP_SECRET || "";
-      if (!appId || !secret) throw new Error("META_APP_ID / META_APP_SECRET set nathi");
+      if (!appId || !secret) throw new Error("META_APP_ID and META_APP_SECRET are not set");
 
       const version = process.env.META_GRAPH_VERSION || "v21.0";
 
-      // App access token magiye chie — ID ane Secret jode barabar che ke
-      // nahi e nakki karvano aa j saacho rasto che. (`debug_token` kyarek
-      // "Cannot get application info due to a system error" aape che, e
-      // khoto sanket che.)
+      // Ask for an app access token: this is the honest way to tell whether
+      // the ID and secret actually belong together. (`debug_token` sometimes
+      // answers "Cannot get application info due to a system error", which is
+      // a misleading signal.)
       const url = new URL(`https://graph.facebook.com/${version}/oauth/access_token`);
       url.searchParams.set("client_id", appId);
       url.searchParams.set("client_secret", secret);
@@ -247,9 +247,9 @@ async function main() {
         error?: { message?: string };
       };
 
-      if (json.error) throw new Error(json.error.message ?? "Meta e na paadi");
-      if (!json.access_token) throw new Error("META_APP_ID ke META_APP_SECRET khoto che");
-      return `app ${appId} barabar che`;
+      if (json.error) throw new Error(json.error.message ?? "Meta refused the request");
+      if (!json.access_token) throw new Error("META_APP_ID or META_APP_SECRET is wrong");
+      return `app ${appId} verified`;
     },
   );
 
@@ -257,10 +257,10 @@ async function main() {
   const blocking = rows.filter((r) => r.required && !r.ok);
   const passed = rows.filter((r) => r.ok).length;
 
-  console.log(`\n  ${passed}/${rows.length} chale che\n`);
+  console.log(`\n  ${passed}/${rows.length} working\n`);
 
   if (blocking.length > 0) {
-    console.log("  ⚠ AA THAY TYA SUDHI REEL NAHI BANE:\n");
+    console.log("  Reels cannot be built until these are fixed:\n");
     for (const row of blocking) {
       console.log(`    • ${row.label}`);
       console.log(`      ${row.note.split("\n").slice(0, 4).join("\n      ").slice(0, 500)}`);
@@ -271,7 +271,7 @@ async function main() {
 
   const optional = rows.filter((r) => !r.required && !r.ok);
   if (optional.length > 0) {
-    console.log("  ○ Aa na hoy to pan chale, pan hoy to saru:\n");
+    console.log("  Optional — everything works without these, but better with them:\n");
     for (const row of optional) {
       console.log(`    • ${row.label} — ${row.fix ?? ""}`);
     }
@@ -279,20 +279,16 @@ async function main() {
   }
 
   if (blocking.length === 0) {
-    console.log("  ✅ Badhu jaruri kaam kare che — Reel Studio ma javo.\n");
+    console.log("  Everything essential works — open the Reel Studio.\n");
   }
 
-  try {
-    const mongoose = (await import("mongoose")).default;
-    if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
-  } catch {
-    /* connection hato j nahi */
-  }
+  const { flushDatabase } = await import("../src/lib/db");
+  flushDatabase();
 
   process.exit(blocking.length === 0 ? 0 : 1);
 }
 
 main().catch((error) => {
-  console.error("\nProbe crash thayu:", error);
+  console.error("\nThe probe crashed:", error);
   process.exit(1);
 });

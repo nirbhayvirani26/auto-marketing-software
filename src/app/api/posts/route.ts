@@ -22,7 +22,7 @@ const createSchema = z
     generatedByAI: z.boolean().optional(),
   })
   .refine((value) => value.account || value.accounts?.length, {
-    message: "Ochha ma ochho ek account select karo",
+    message: "Select at least one account",
     path: ["accounts"],
   });
 
@@ -78,7 +78,7 @@ export const POST = handle(async (request) => {
     brand: ctx.brandId,
   });
   if (accounts.length === 0) {
-    return fail("Ek pan valid social account madyu nahi", 404);
+    return fail("No valid social account was found", 404);
   }
 
   const status = body.status ?? "draft";
@@ -93,7 +93,7 @@ export const POST = handle(async (request) => {
     if (account.platform === "instagram" && !body.mediaUrl) {
       skipped.push({
         account: account.displayName,
-        reason: "Instagram mate public image URL farjiyat che",
+        reason: "Instagram requires a publicly reachable image URL",
       });
       continue;
     }

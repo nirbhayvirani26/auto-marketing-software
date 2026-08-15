@@ -19,7 +19,7 @@ function modelName(): string {
 
 export const ollamaProvider: AiProvider = {
   key: "ollama",
-  label: "Ollama (local — sav free)",
+  label: "Ollama (runs locally, entirely free)",
   free: true,
   get model() {
     return modelName();
@@ -52,7 +52,7 @@ export const ollamaProvider: AiProvider = {
       });
     } catch (error) {
       throw new AiError(
-        `Ollama sudhi pahonchi na shakaya (${host()}). Chalu che? \`ollama serve\` chalavo. [${(error as Error).message}]`,
+        `Could not reach Ollama at ${host()}. Is it running? Start it with \`ollama serve\`. [${(error as Error).message}]`,
         "ollama",
         true,
       );
@@ -87,7 +87,7 @@ export const ollamaProvider: AiProvider = {
       return JSON.parse(content) as T;
     } catch {
       throw new AiError(
-        "Ollama no response JSON ma nathi — motto model vapro (llama3.1:8b ke uper)",
+        "Ollama's response was not JSON — use a larger model (llama3.1:8b or above)",
         "ollama",
         true,
       );

@@ -53,9 +53,9 @@ function VerifyForm() {
       });
       if (result.devCode) {
         setCode(result.devCode);
-        setNotice(`SMTP set nathi — dev code: ${result.devCode}`);
+        setNotice(`Email is not configured — your code is ${result.devCode}`);
       } else {
-        setNotice("Navo code email par moklyo che");
+        setNotice("A new code is on its way to your inbox");
       }
     } catch (e) {
       setError((e as Error).message);
@@ -91,15 +91,15 @@ function VerifyForm() {
             >
               <MarkEmailReadIcon />
             </Box>
-            <Typography variant="h5">Email verify karo</Typography>
+            <Typography variant="h5">Verify your email</Typography>
             <Typography variant="body2" color="text.secondary" textAlign="center">
-              6-digit code moklyo che <strong>{email}</strong> par
+              We sent a 6-digit code to <strong>{email}</strong>
             </Typography>
           </Stack>
 
           {devCode && (
             <Alert severity="info" sx={{ mb: 2 }}>
-              SMTP set nathi, etle code ahiya batavyo che: <strong>{devCode}</strong>
+              Email is not configured, so here is the code: <strong>{devCode}</strong>
             </Alert>
           )}
           {notice && (
@@ -141,7 +141,7 @@ function VerifyForm() {
                 disabled={loading || code.length < 4}
                 fullWidth
               >
-                {loading ? "Verify thai rahyu…" : "Verify karo"}
+                {loading ? "Verifying…" : "Verify"}
               </Button>
               <Button onClick={handleResend} size="small">
                 Code na malyo? Fari moklo

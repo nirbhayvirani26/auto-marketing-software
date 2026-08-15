@@ -99,7 +99,7 @@ export default function CampaignsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Aa campaign delete karvu che?")) return;
+    if (!confirm("Delete this campaign?")) return;
     try {
       await apiFetch(`/api/campaigns/${id}`, { method: "DELETE" });
       load();
@@ -112,14 +112,14 @@ export default function CampaignsPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Campaigns"
-        subtitle="Brand voice, keywords ane accounts nu group — AI aane context tarike vaapre che"
+        subtitle="A group of brand voice, keywords and accounts. The AI uses it as context for everything it writes."
         action={
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setOpen(true)}
           >
-            Campaign banavo
+            New campaign
           </Button>
         }
       />
@@ -143,7 +143,7 @@ export default function CampaignsPage() {
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Have sudhi koi campaign nathi.
+                      No campaigns yet.
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -234,7 +234,7 @@ export default function CampaignsPage() {
               label="Call to action"
               value={form.callToAction}
               onChange={(e) => setForm({ ...form, callToAction: e.target.value })}
-              placeholder="Aaje j book karo →"
+              placeholder="Book yours today"
               fullWidth
             />
             <TextField

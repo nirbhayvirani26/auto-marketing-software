@@ -1,15 +1,15 @@
 /**
- * Multi-API pipeline runner.
+ * Multi-provider pipeline runner.
  *
- * Aakha app ma jya pan bahar ni service par aadhaar rakhvo pade — text AI,
- * vision, image, video, TTS, trends, hosting — tya aa j runner vaparie chie.
- * Ek provider ni limit lage, key khute, ke service down thay to biju provider
- * apoaap try thay che. Etle marketing kyarey atkatu nathi.
+ * Everywhere this app depends on an outside service — text AI, vision, image,
+ * video, text-to-speech, trends, hosting — it goes through this runner. If one
+ * provider hits its rate limit, runs out of key, or goes down, the next one
+ * takes over automatically. The marketing never stops because of one outage.
  *
- * Traney rakshan sathe aave che:
- *   • timeout        — hang thayelo provider aakha job ne roki na shake
- *   • retry+backoff  — kaamchalau error (429 / 5xx / network) par fari try
- *   • circuit breaker— vaar vaar fail thato provider thodo vakhat skip thay
+ * Three protections come built in:
+ *   • timeout        — a hung provider cannot stall the whole job
+ *   • retry+backoff  — transient errors (429 / 5xx / network) are retried
+ *   • circuit breaker— a repeatedly failing provider is skipped for a while
  */
 
 export type Attempt = {
@@ -24,45 +24,45 @@ export type ChainResult<T> = {
   data: T;
   provider: string;
   attempts: Attempt[];
-  /** Kul kaam no samay (ms). */
+  /** Total time for the whole chain, in milliseconds. */
   ms: number;
 };
 
 export type Candidate<T> = {
-  /** Log ma dekhaay evu naam, dakhla tarike "gemini". */
+  /** The name used in logs, for example "gemini". */
   name: string;
-  /** Human-friendly label — UI ma batavva mate. */
+  /** A human-readable label, shown in the UI. */
   label?: string;
-  /** Free service che? Free ne pehli pasandgi apay che. */
+  /** Is it free? Free providers are tried first by default. */
   free?: boolean;
-  /** Key/config hajar che ke nahi. false hoy to chhodine aagal vadhay che. */
+  /** Whether the key or config exists. When false the provider is skipped. */
   configured?: () => boolean;
-  /** Aa provider nu kaam. */
+  /** The actual call. */
   run: (signal: AbortSignal) => Promise<T>;
-  /** Aa provider mate alag timeout joito hoy to. */
+  /** A timeout just for this provider. */
   timeoutMs?: number;
-  /** Aa provider mate alag retry count joito hoy to. */
+  /** A retry count just for this provider. */
   retries?: number;
 };
 
 export type ChainOptions = {
-  /** Log ma dekhaay evu kaam nu naam. */
+  /** The name of the task, used in logs and error messages. */
   label: string;
-  /** Provider dith default timeout. */
+  /** Default timeout per provider. */
   timeoutMs?: number;
-  /** Ek provider par ketli var retry (pehla prayatna sivay). */
+  /** Retries per provider, on top of the first attempt. */
   retries?: number;
-  /** Retry vachhe no pehlo wait. */
+  /** The first wait between retries. */
   backoffMs?: number;
-  /** true = free provider pehla try thay. */
+  /** true means free providers are tried first. */
   preferFree?: boolean;
-  /** Aa naam nu provider sauthi pehla try thay (user ni pasandgi). */
+  /** Force this provider to the front of the queue. */
   prefer?: string;
-  /** Dareak attempt pachi call thay — logging mate. */
+  /** Called after every attempt, for logging. */
   onAttempt?: (attempt: Attempt) => void;
 };
 
-/** Retry karva jevi bhool che ke kaayami bhool — e nakki kare che. */
+/** A failure worth retrying — a rate limit, a 5xx, a dropped connection. */
 export class RetryableError extends Error {
   readonly retryable = true;
   constructor(message: string) {
@@ -71,7 +71,7 @@ export class RetryableError extends Error {
   }
 }
 
-/** Aa bhool retry thi sudhrse nahi (khoti key, khotu input). */
+/** A failure retrying will not fix: a bad key, invalid input, a blocked prompt. */
 export class FatalError extends Error {
   readonly retryable = false;
   constructor(message: string) {
@@ -80,7 +80,7 @@ export class FatalError extends Error {
   }
 }
 
-/** Aakhi chain fail thai — dareak provider e su kahyu e andar che. */
+/** Every provider failed. The individual reasons are attached. */
 export class ChainError extends Error {
   constructor(
     message: string,
@@ -90,17 +90,22 @@ export class ChainError extends Error {
     this.name = "ChainError";
   }
 
-  /** UI ma batavva layak tunku karan. */
+  /** A short reason suitable for showing in the UI. */
   get summary(): string {
-    return this.attempts
-      .filter((a) => !a.ok)
-      .map((a) => `${a.provider}: ${a.skipped ?? a.error}`)
+    const seen = new Map<string, string>();
+    for (const attempt of this.attempts) {
+      if (attempt.ok) continue;
+      if (seen.has(attempt.provider)) continue;
+      seen.set(attempt.provider, attempt.skipped ?? attempt.error ?? "failed");
+    }
+    return [...seen.entries()]
+      .map(([provider, reason]) => `${provider}: ${reason}`)
       .join(" | ");
   }
 }
 
 /* ------------------------------------------------------------------ *
- *  Circuit breaker — vaar vaar fail thato provider thodi var skip
+ *  Circuit breaker — a provider that keeps failing is skipped for a while
  * ------------------------------------------------------------------ */
 
 type BreakerState = { failures: number; openUntil: number };
@@ -114,7 +119,7 @@ function breakerOpen(name: string): boolean {
   if (!state) return false;
   if (state.openUntil > Date.now()) return true;
   if (state.openUntil !== 0) {
-    // Cooldown puro — fari ek mauko aapo.
+    // The cooldown is over — give it another chance.
     breakers.set(name, { failures: 0, openUntil: 0 });
   }
   return false;
@@ -133,12 +138,12 @@ function breakerRecord(name: string, ok: boolean): void {
   breakers.set(name, state);
 }
 
-/** Test / admin mate — badha breakers saaf karo. */
+/** Clears every breaker. Used by tests and by the admin panel. */
 export function resetBreakers(): void {
   breakers.clear();
 }
 
-/** Admin panel mate — atyare kaya providers "open" (skip thai rahya) che. */
+/** Which providers are currently being skipped, for the admin panel. */
 export function breakerStatus(): Array<{
   provider: string;
   failures: number;
@@ -164,7 +169,7 @@ function isRetryable(error: unknown): boolean {
   if (message.includes("abort") || message.includes("timeout")) return true;
   if (message.includes("econnreset") || message.includes("enotfound")) return true;
   if (message.includes("fetch failed") || message.includes("socket")) return true;
-  // HTTP status jevu kaink message ma hoy to.
+  // A status code that leaked into the message.
   if (/\b(429|500|502|503|504)\b/.test(message)) return true;
   if (message.includes("rate limit") || message.includes("quota")) return true;
   if (message.includes("overloaded") || message.includes("unavailable")) return true;
@@ -189,8 +194,8 @@ async function withTimeout<T>(
 }
 
 /**
- * Candidates ne kram ma try kare. Pehlo je safal thay e no jawab pacho aape.
- * Badha fail thay to ChainError — jema dareak provider e su kahyu e hoy che.
+ * Tries each candidate in order and returns the first success. If they all
+ * fail it throws a ChainError carrying what every provider said.
  */
 export async function runChain<T>(
   candidates: Array<Candidate<T>>,
@@ -203,7 +208,7 @@ export async function runChain<T>(
 
   if (ordered.length === 0) {
     throw new ChainError(
-      `${options.label}: ek pan provider configure nathi. Setup page ma javo ane key nakho.`,
+      `${options.label}: no provider is configured. Open the Setup page and add a key.`,
       attempts,
     );
   }
@@ -275,23 +280,44 @@ export async function runChain<T>(
           breakerRecord(candidate.name, false);
           break;
         }
-        // Exponential backoff + jitter — badha client ek saathe pacha na aave.
+        // Exponential backoff with jitter, so retries do not arrive in lockstep.
         const wait = backoff * 2 ** tryIndex + Math.floor(Math.random() * 250);
         await sleep(wait);
       }
     }
   }
 
-  const detail = attempts
-    .map((a) => `• ${a.provider}: ${a.skipped ?? a.error ?? "fail"}`)
-    .join("\n");
-
-  throw new ChainError(`${options.label} — koi pan provider chalyo nahi.\n${detail}`, attempts);
+  throw new ChainError(
+    `${options.label} — every provider failed.\n${summariseAttempts(attempts)}`,
+    attempts,
+  );
 }
 
 /**
- * runChain no "fail thay to undefined" variant. Optional step mate — jem ke
- * voiceover ke trend lookup — jya kaam atakvu na joiye.
+ * One line per provider, with retries of the same failure collapsed.
+ *
+ * A provider that is retried twice produces the identical message twice, and
+ * repeating it only makes the real problem harder to spot.
+ */
+function summariseAttempts(attempts: Attempt[]): string {
+  const seen = new Map<string, string>();
+
+  for (const attempt of attempts) {
+    if (attempt.ok) continue;
+    const reason = attempt.skipped ?? attempt.error ?? "failed";
+    // Keep the first reason per provider; later ones are retries of it.
+    if (!seen.has(attempt.provider)) seen.set(attempt.provider, reason);
+  }
+
+  return [...seen.entries()]
+    .map(([provider, reason]) => `• ${provider}: ${reason}`)
+    .join("\n");
+}
+
+/**
+ * The forgiving variant of runChain: returns null instead of throwing. For
+ * optional steps such as voiceover or a trend lookup, where failure should not
+ * stop the job.
  */
 export async function runChainSoft<T>(
   candidates: Array<Candidate<T>>,
@@ -334,18 +360,69 @@ function normaliseError(error: unknown): string {
 }
 
 /* ------------------------------------------------------------------ *
- *  HTTP helper — badha providers aa vaparé che
+ *  HTTP helper — every provider goes through this
  * ------------------------------------------------------------------ */
 
 export type FetchJsonOptions = RequestInit & {
   signal?: AbortSignal;
-  /** JSON ni jagya e binary joitu hoy to. */
+  /** Ask for binary or plain text instead of JSON. */
   expect?: "json" | "buffer" | "text";
 };
 
 /**
- * fetch nu wrapper je HTTP status ne saachi RetryableError / FatalError ma
- * badle che, jethi upar no runner samji shake ke fari try karvu ke nahi.
+ * Turns a provider's error body into one readable sentence.
+ *
+ * Google, OpenAI, Anthropic, Groq and OpenRouter all wrap their message the
+ * same way — `{"error":{"message":"…"}}`. Dumping the raw JSON into the UI, as
+ * this used to, buries the one useful sentence inside three hundred characters
+ * of braces and status codes. Pull the sentence out and, where the cause is
+ * unmistakable, say what to do about it.
+ */
+export function describeApiError(status: number, body: string): string {
+  let detail = "";
+
+  try {
+    const parsed = JSON.parse(body) as {
+      error?: { message?: string; status?: string } | string;
+      message?: string;
+      detail?: string;
+    };
+    const inner = parsed.error;
+    detail =
+      (typeof inner === "string" ? inner : inner?.message) ||
+      parsed.message ||
+      parsed.detail ||
+      "";
+  } catch {
+    // Not JSON — an HTML error page, or plain text.
+    detail = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  }
+
+  detail = detail.trim().slice(0, 220);
+
+  // The handful of failures worth naming explicitly, because the fix differs.
+  const lower = detail.toLowerCase();
+  if (lower.includes("credits are depleted") || lower.includes("credit balance is too low")) {
+    return "the account is out of credit — top it up, or switch to another provider";
+  }
+  if (status === 429) {
+    return detail
+      ? `rate limited — ${detail}`
+      : "rate limited — it will be retried automatically";
+  }
+  if (status === 401 || status === 403) {
+    return detail ? `the key was rejected — ${detail}` : "the key was rejected";
+  }
+  if (status === 404 && lower.includes("model")) {
+    return `that model is no longer available — ${detail}`;
+  }
+
+  return detail || "no detail returned";
+}
+
+/**
+ * A fetch wrapper that turns HTTP status codes into RetryableError or
+ * FatalError, so the runner above knows whether trying again is worth it.
  */
 export async function apiFetch<T = unknown>(
   url: string,
@@ -362,7 +439,7 @@ export async function apiFetch<T = unknown>(
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    const message = `HTTP ${response.status} ${body.slice(0, 300)}`;
+    const message = `HTTP ${response.status} — ${describeApiError(response.status, body)}`;
 
     if (response.status === 429 || response.status >= 500) {
       throw new RetryableError(message);
@@ -381,6 +458,6 @@ export async function apiFetch<T = unknown>(
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new RetryableError(`Jawab JSON ma nathi: ${text.slice(0, 200)}`);
+    throw new RetryableError(`Response was not JSON: ${text.slice(0, 200)}`);
   }
 }

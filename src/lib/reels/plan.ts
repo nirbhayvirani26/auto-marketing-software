@@ -11,7 +11,7 @@
  */
 
 import { complete } from "@/lib/ai/index";
-import type { ProductIntelligence } from "@/lib/ai/vision";
+import { productLabel, type ProductIntelligence } from "@/lib/ai/vision";
 import type { TrendPack } from "@/lib/trends/keywords";
 import type { MotionPreset, TransitionType } from "@/lib/video/render";
 
@@ -199,7 +199,36 @@ export type ReferenceStyle = {
 export async function planReel(options: PlanOptions): Promise<ReelPlan> {
   const target = clamp(options.targetDuration ?? 40, 15, 90);
 
-  const { data } = await complete<PlanResponse>({
+  let data: PlanResponse;
+  try {
+    ({ data } = await directWithAi(options, target));
+  } catch (error) {
+    // Every provider is unavailable. A plain shot list built from the product
+    // facts still produces a reel worth publishing, so the render goes ahead.
+    console.warn(
+      `[plan] No AI provider available (${(error as Error).message}). Using a template shot list.`,
+    );
+    const product = options.product;
+    const label = productLabel(product, options.brandName);
+    return normalisePlan(
+      {
+        concept: `${label} — straight product showcase`,
+        coverText: trimWords(label, 6),
+        captionSeed: product.sellingPoints[0] || label,
+        musicMood: "upbeat",
+        // Empty, so normalisePlan() falls through to fallbackScenes().
+        scenes: [],
+      },
+      options,
+      target,
+    );
+  }
+
+  return normalisePlan(data, options, target);
+}
+
+function directWithAi(options: PlanOptions, target: number) {
+  return complete<PlanResponse>({
     system: [
       "You are a short-form video director who makes Instagram Reels that actually sell.",
       "You understand the only three things that matter: the first 3 seconds decide the watch rate, a visual change every 2-3 seconds keeps people watching, and the last 2 seconds decide whether they save or share.",
@@ -212,8 +241,6 @@ export async function planReel(options: PlanOptions): Promise<ReelPlan> {
     schema: PLAN_SCHEMA,
     maxTokens: 5000,
   });
-
-  return normalisePlan(data, options, target);
 }
 
 function buildPrompt(options: PlanOptions, target: number): string {
@@ -412,11 +439,11 @@ function normalisePlan(
   const finalDuration = scenes.reduce((sum, s) => sum + s.duration, 0);
 
   return {
-    concept: String(raw.concept ?? "").trim() || `${options.product.productName} reel`,
+    concept: String(raw.concept ?? "").trim() || `${productLabel(options.product, options.brandName)} reel`,
     scenes: scenes.map((s, index) => ({ ...s, index })),
     totalDuration: Math.round(finalDuration * 10) / 10,
     musicMood: String(raw.musicMood ?? "upbeat"),
-    coverText: trimWords(String(raw.coverText ?? options.product.productName), 6),
+    coverText: trimWords(String(raw.coverText || productLabel(options.product, options.brandName)), 6),
     captionSeed: String(raw.captionSeed ?? "").trim(),
   };
 }
@@ -471,7 +498,7 @@ function fallbackScenes(options: PlanOptions, target: number): PlannedScene[] {
   const imageCount = Math.max(1, options.uploadedImageCount);
 
   const texts = [
-    p.sellingPoints[0] ?? p.productName,
+    p.sellingPoints[0] || productLabel(p, options.brandName),
     p.colors.length ? p.colors.join(" · ") : p.subCategory,
     p.materials.length ? p.materials.join(" · ") : p.style,
     p.occasions[0] ?? "",

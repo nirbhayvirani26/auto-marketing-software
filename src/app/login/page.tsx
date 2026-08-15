@@ -43,7 +43,7 @@ function LoginForm() {
       });
       const json = await response.json();
 
-      // Email verify baaki hoy to OTP screen par lai jao.
+      // An unverified email goes to the one-time-code screen.
       if (json?.extra?.needsVerification) {
         const query = new URLSearchParams({ email: json.extra.email });
         if (json.extra.devCode) query.set("dev", json.extra.devCode);
@@ -52,7 +52,7 @@ function LoginForm() {
       }
 
       if (!response.ok || !json.ok) {
-        throw new Error(json.error ?? "Login fail thayu");
+        throw new Error(json.error ?? "Sign in failed");
       }
 
       // Super admin ne platform panel ma, baki na ne user panel ma.
@@ -107,7 +107,7 @@ function LoginForm() {
             </Box>
             <Typography variant="h5">Auto Marketing</Typography>
             <Typography variant="body2" color="text.secondary" textAlign="center">
-              Admin panel ma login karo
+              Sign in to your workspace
             </Typography>
           </Stack>
 
@@ -145,16 +145,16 @@ function LoginForm() {
                 disabled={loading}
                 fullWidth
               >
-                {loading ? "Login thai rahyu che…" : "Login"}
+                {loading ? "Signing in…" : "Sign in"}
               </Button>
             </Stack>
           </Box>
 
           <Divider sx={{ my: 3 }} />
           <Typography variant="body2" textAlign="center">
-            Account nathi?{" "}
+            No account yet?{" "}
             <Link href="/register" style={{ color: "inherit" }}>
-              <strong>Free ma shuru karo</strong>
+              <strong>Start for free</strong>
             </Link>
           </Typography>
         </CardContent>

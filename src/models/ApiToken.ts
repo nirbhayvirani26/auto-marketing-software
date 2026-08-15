@@ -1,13 +1,27 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
 import { createHash, randomBytes } from "node:crypto";
 
+import { model, ObjectId, Schema, type BaseFields } from "@/lib/localdb";
+
 /**
- * Organization no API token — n8n ke biji koi service aa app ne call kari
- * shake e mate.
+ * An API token for an organization, so n8n or any other service can call this
+ * app.
  *
- * Token plain-text kadi store nathi thato; fakt SHA-256 hash rahe che ane
- * olakhva mate chhella 4 characters.
+ * The plain token is never stored — only its SHA-256 hash, plus the last four
+ * characters so a person can recognise which token is which.
  */
+export type ApiTokenDoc = BaseFields & {
+  organization: ObjectId;
+  name: string;
+  tokenHash: string;
+  tokenSuffix: string;
+  scopes: string[];
+  lastUsedAt?: Date;
+  useCount: number;
+  expiresAt?: Date;
+  revokedAt?: Date;
+  createdBy?: ObjectId;
+};
+
 const ApiTokenSchema = new Schema(
   {
     organization: {
@@ -33,19 +47,13 @@ const ApiTokenSchema = new Schema(
   { timestamps: true },
 );
 
-export type ApiTokenDoc = InferSchemaType<typeof ApiTokenSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
-
-export const ApiToken: Model<ApiTokenDoc> =
-  (mongoose.models.ApiToken as Model<ApiTokenDoc>) ||
-  mongoose.model<ApiTokenDoc>("ApiToken", ApiTokenSchema);
+export const ApiToken = model<ApiTokenDoc>("ApiToken", ApiTokenSchema);
 
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-/** Navo token banave — plain value fakt ek j vaar pacho aape che. */
+/** Mints a new token. The plain value is returned exactly once. */
 export function generateToken(): { token: string; hash: string; suffix: string } {
   const token = `amk_${randomBytes(24).toString("base64url")}`;
   return {

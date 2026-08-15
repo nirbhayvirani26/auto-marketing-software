@@ -1,19 +1,19 @@
 /**
- * Public hosting — Instagram/Facebook ne file aapva mate.
+ * Public hosting — how files reach Instagram and Facebook.
  *
- * ⚠️ Aa aakha system nu sauthi motu "gotcha": Meta na server aapni file
- * download kare che. Etle `http://localhost:3000/...` KYAREY nahi chale —
- * public https URL joiye j.
+ * This is the biggest gotcha in the whole system: Meta's servers download your
+ * file themselves. `http://localhost:3000/...` will NEVER work — a public
+ * https URL is mandatory.
  *
- * Etle ahiya ek chain rakhi che. Uper thi niche — je configure hoy e chale:
+ * So there is a chain here, tried top to bottom, using whichever is configured:
  *
- *   1. cloudinary — best (free 25GB, saacho CDN, video support, kayami URL)
- *   2. imgbb      — free key, fakt image
- *   3. catbox     — koi key nahi, image + video, anonymous
- *   4. tmpfiles   — koi key nahi, 1 kalak ni file (chhelli aasha)
- *   5. base-url   — tamaru potanu domain / ngrok tunnel
+ *   1. cloudinary — the best option (25GB free, a real CDN, video, permanent URLs)
+ *   2. imgbb      — free key, images only
+ *   3. catbox     — no key, images and video, anonymous
+ *   4. tmpfiles   — no key, files last an hour (a last resort)
+ *   5. base-url   — your own domain or an ngrok tunnel
  *
- * Ek pan na chale to samjay evo error aave che — chup-chaap fail nahi.
+ * If none of them work the error says so plainly — it never fails silently.
  */
 
 import { apiFetch, runChain, FatalError, type ChainResult } from "@/lib/pipeline/chain";
@@ -21,7 +21,7 @@ import { apiFetch, runChain, FatalError, type ChainResult } from "@/lib/pipeline
 export type UploadedFile = {
   url: string;
   host: string;
-  /** Aa URL kyare khatam thashe (khabar hoy to). */
+  /** When this URL expires, where that is known. */
   expiresAt?: Date;
 };
 
@@ -166,7 +166,7 @@ async function uploadToTmpfiles(
   );
 
   const page = json.data?.url;
-  if (!page) throw new FatalError("tmpfiles: URL na madyu");
+  if (!page) throw new FatalError("tmpfiles returned no URL");
 
   // tmpfiles page URL aape che — direct download mate `/dl/` umervu pade.
   const direct = page.replace("tmpfiles.org/", "tmpfiles.org/dl/");
@@ -211,7 +211,7 @@ export async function uploadPublic(
       },
       {
         name: "imgbb",
-        label: "ImgBB (free, fakt image)",
+        label: "ImgBB (free, images only)",
         free: true,
         configured: () => Boolean(process.env.IMGBB_API_KEY) && isImage,
         run: (signal) => uploadToImgbb(input, signal),
@@ -219,7 +219,7 @@ export async function uploadPublic(
       },
       {
         name: "catbox",
-        label: "Catbox (key vagar)",
+        label: "Catbox (no key needed)",
         free: true,
         configured: () => process.env.MEDIA_ALLOW_ANON_HOSTS !== "false",
         run: (signal) => uploadToCatbox(input, signal),
@@ -227,7 +227,7 @@ export async function uploadPublic(
       },
       {
         name: "tmpfiles",
-        label: "tmpfiles.org (key vagar, 1 kalak)",
+        label: "tmpfiles.org (no key, files last 1 hour)",
         free: true,
         configured: () => process.env.MEDIA_ALLOW_ANON_HOSTS !== "false",
         run: (signal) => uploadToTmpfiles(input, signal),
@@ -253,7 +253,7 @@ export function hostStatus() {
       free: true,
       configured: cloudinaryConfigured(),
       recommended: true,
-      note: "Sauthi saaru — free 25GB, video support, kayami URL. cloudinary.com par signup → Settings → Upload → unsigned preset banavo.",
+      note: "The best option — 25GB free, video support, permanent URLs. Sign up at cloudinary.com, then Settings → Upload → create an unsigned preset.",
     },
     {
       key: "imgbb" as const,
@@ -269,7 +269,7 @@ export function hostStatus() {
       free: true,
       configured: anon,
       recommended: false,
-      note: "Koi key nahi — turant chale. Image + video.",
+      note: "No key needed — works immediately. Images and video.",
     },
     {
       key: "tmpfiles" as const,
@@ -277,7 +277,7 @@ export function hostStatus() {
       free: true,
       configured: anon,
       recommended: false,
-      note: "Koi key nahi, pan file fakt 1 kalak rahe che. Chhelli aasha.",
+      note: "No key needed, but files are deleted after an hour. A last resort.",
     },
     {
       key: "base-url" as const,
@@ -285,7 +285,7 @@ export function hostStatus() {
       free: true,
       configured: Boolean(process.env.PUBLIC_MEDIA_BASE_URL),
       recommended: false,
-      note: "PUBLIC_MEDIA_BASE_URL set karo (dakhla tarike ngrok ke tamaru domain) to /api/media sidhu vaparashe.",
+      note: "Set PUBLIC_MEDIA_BASE_URL (an ngrok tunnel or your own domain) and /api/media will be served directly.",
     },
   ];
 }

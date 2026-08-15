@@ -19,7 +19,7 @@ export const GET = handle(async (_request, { params }) => {
     .populate("account", "displayName platform")
     .populate("campaign", "name")
     .lean();
-  if (!post) return fail("Post madyo nahi", 404);
+  if (!post) return fail("Post not found", 404);
   return ok(post);
 });
 
@@ -31,7 +31,7 @@ export const PATCH = handle(async (request, { params }) => {
   const body = updateSchema.parse(await request.json());
 
   const post = await Post.findOne({ _id: id, brand: ctx.brandId });
-  if (!post) return fail("Post madyo nahi", 404);
+  if (!post) return fail("Post not found", 404);
   if (post.status === "published") {
     return fail("Publish thai gayela post ne edit na karay", 409);
   }
@@ -57,6 +57,6 @@ export const DELETE = handle(async (_request, { params }) => {
 
   const { id } = await params;
   const post = await Post.findOneAndDelete({ _id: id, brand: ctx.brandId });
-  if (!post) return fail("Post madyo nahi", 404);
+  if (!post) return fail("Post not found", 404);
   return ok({ deleted: true });
 });

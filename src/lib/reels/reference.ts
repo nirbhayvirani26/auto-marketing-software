@@ -119,7 +119,7 @@ export async function analyzeReference(
   videoPath: string,
 ): Promise<ReferenceAnalysis> {
   const info = await probe(videoPath);
-  if (!info.hasVideo) throw new Error("Aa file ma video nathi");
+  if (!info.hasVideo) throw new Error("There is no video in that file");
 
   const duration = info.duration || 30;
 

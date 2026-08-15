@@ -131,7 +131,7 @@ export default function SuperAdminOverview() {
             href="/superadmin/organizations"
             variant="contained"
           >
-            Organizations jovo
+            View organizations
           </Button>
         }
       />
@@ -230,7 +230,7 @@ export default function SuperAdminOverview() {
               <Divider sx={{ mb: 1 }} />
               {data.recentOrgs.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                  Have sudhi koi organization nathi.
+                  There are no organizations yet.
                 </Typography>
               ) : (
                 <List dense disablePadding>

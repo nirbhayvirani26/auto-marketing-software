@@ -1,10 +1,25 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { model, ObjectId, Schema, type BaseFields } from "@/lib/localdb";
 
 /**
- * Brand = ek workspace. Dareak brand na potana social accounts, campaigns,
- * posts ane automations hoy che. Admin panel ma uper thi brand switch thay che
- * ane badhu data e brand pramane filter thay che.
+ * A brand is one workspace. Each brand owns its own social accounts,
+ * campaigns, posts and automations. The top bar switches between brands and
+ * every list in the admin panel is filtered by the active one.
  */
+export type BrandDoc = BaseFields & {
+  organization: ObjectId;
+  name: string;
+  slug: string;
+  description?: string;
+  logoUrl?: string;
+  brandVoice: string;
+  targetAudience?: string;
+  website?: string;
+  defaultHashtags: string[];
+  color: string;
+  active: boolean;
+  createdBy?: ObjectId;
+};
+
 const BrandSchema = new Schema(
   {
     organization: {
@@ -17,12 +32,12 @@ const BrandSchema = new Schema(
     slug: { type: String, required: true, lowercase: true, trim: true },
     description: { type: String, trim: true },
     logoUrl: { type: String, trim: true },
-    // Aa brand na badha AI generation mate default context
+    // Default context for every AI generation under this brand.
     brandVoice: { type: String, trim: true, default: "friendly, professional" },
     targetAudience: { type: String, trim: true },
     website: { type: String, trim: true },
     defaultHashtags: { type: [String], default: [] },
-    // UI ma brand ne olakhva mate
+    // Used to tell brands apart in the UI.
     color: { type: String, trim: true, default: "#5B5BD6" },
     active: { type: Boolean, default: true, index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
@@ -30,16 +45,10 @@ const BrandSchema = new Schema(
   { timestamps: true },
 );
 
-// Slug ek organization ni andar unique — bhinna orgs ma same slug chale.
+// A slug is unique inside an organization; different orgs may reuse it.
 BrandSchema.index({ organization: 1, slug: 1 }, { unique: true });
 
-export type BrandDoc = InferSchemaType<typeof BrandSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
-
-export const Brand: Model<BrandDoc> =
-  (mongoose.models.Brand as Model<BrandDoc>) ||
-  mongoose.model<BrandDoc>("Brand", BrandSchema);
+export const Brand = model<BrandDoc>("Brand", BrandSchema);
 
 /** "My Brand Name" -> "my-brand-name" */
 export function slugify(value: string): string {

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     template: "%s · Auto Marketing",
   },
   description:
-    "AI thi social media post banavo, schedule karo ane Facebook/Instagram par auto publish karo.",
+    "Write social media posts with AI, schedule them, and publish automatically to Facebook and Instagram.",
 };
 
 export const viewport: Viewport = {

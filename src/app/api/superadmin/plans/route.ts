@@ -54,16 +54,13 @@ export const GET = handle(async () => {
 
   const plans = await Plan.find().sort({ sortOrder: 1 }).lean();
 
-  // Dareak plan par ketli organizations che.
-  const counts = await Organization.aggregate<{ _id: unknown; count: number }>([
-    { $group: { _id: "$plan", count: { $sum: 1 } } },
-  ]);
-  const countMap = new Map(counts.map((row) => [String(row._id), row.count]));
+  // How many organizations sit on each plan.
+  const countByPlan = await Organization.groupCount("plan");
 
   return ok(
     plans.map((plan) => ({
       ...plan,
-      organizationCount: countMap.get(String(plan._id)) ?? 0,
+      organizationCount: countByPlan[String(plan._id)] ?? 0,
     })),
   );
 });

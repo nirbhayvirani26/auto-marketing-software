@@ -71,7 +71,7 @@ export default function SuperAdminUsers() {
     const newPassword = prompt(`${user.email} — navo password (min 8 chars):`);
     if (!newPassword) return;
     if (newPassword.length < 8) {
-      setError("Password ochha ma ochho 8 character no hovo joiye");
+      setError("The password must be at least 8 characters");
       return;
     }
     await patch(user._id, { newPassword });
@@ -82,7 +82,7 @@ export default function SuperAdminUsers() {
     <Stack spacing={3}>
       <PageHeader
         title="Users"
-        subtitle="Kayo user kai organization ma che, ane eno role"
+        subtitle="Who belongs to which organization, and what they can do."
       />
 
       {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
@@ -164,7 +164,7 @@ export default function SuperAdminUsers() {
                     <Typography variant="caption" color="text.secondary">
                       {user.lastLoginAt
                         ? new Date(user.lastLoginAt).toLocaleString()
-                        : "kadi nahi"}
+                        : "never"}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -175,7 +175,7 @@ export default function SuperAdminUsers() {
                     />
                   </TableCell>
                   <TableCell align="right">
-                    <Tooltip title="Password reset karo">
+                    <Tooltip title="Reset password">
                       <IconButton size="small" onClick={() => resetPassword(user)}>
                         <KeyIcon fontSize="small" />
                       </IconButton>

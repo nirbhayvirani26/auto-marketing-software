@@ -59,7 +59,7 @@ export function ffprobePath(): string {
     return bundled.path;
   }
 
-  throw new Error("ffprobe madyu nahi. `npm install ffprobe-static` chalavo.");
+  throw new Error("ffprobe was not found. Run `npm install ffprobe-static`.");
 }
 
 /** Setup page mate — video banavi shakash ke nahi. */

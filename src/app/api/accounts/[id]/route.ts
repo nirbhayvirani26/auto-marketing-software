@@ -27,7 +27,7 @@ export const PATCH = handle(async (request, { params }) => {
     body,
     { new: true },
   );
-  if (!account) return fail("Account madyu nahi", 404);
+  if (!account) return fail("Account not found", 404);
 
   return ok({ id: String(account._id) });
 });
@@ -41,7 +41,7 @@ export const DELETE = handle(async (_request, { params }) => {
     _id: id,
     brand: ctx.brandId,
   });
-  if (!account) return fail("Account madyu nahi", 404);
+  if (!account) return fail("Account not found", 404);
 
   await logActivity({
     level: "warning",

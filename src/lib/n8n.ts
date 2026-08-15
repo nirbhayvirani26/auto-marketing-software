@@ -16,7 +16,7 @@ export async function notifyN8n(
   payload: Record<string, unknown>,
 ): Promise<{ delivered: boolean; error?: string }> {
   const url = env.n8nWebhookUrl;
-  if (!url) return { delivered: false, error: "N8N_WEBHOOK_URL set nathi" };
+  if (!url) return { delivered: false, error: "N8N_WEBHOOK_URL is not set" };
 
   try {
     const response = await fetch(url, {

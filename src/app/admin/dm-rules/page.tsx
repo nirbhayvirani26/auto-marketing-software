@@ -171,7 +171,7 @@ export default function DmRulesPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Aa rule delete karvu che?")) return;
+    if (!confirm("Delete this rule?")) return;
     try {
       await apiFetch(`/api/comment-rules/${id}`, { method: "DELETE" });
       load();
@@ -200,7 +200,7 @@ export default function DmRulesPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Auto DM & Replies"
-        subtitle="Koi tamara post par comment kare to aapoaap jawab aapo ane DM moklo"
+        subtitle="When someone comments on your post, reply publicly and send them a direct message."
         action={
           <Button
             variant="contained"
@@ -220,13 +220,13 @@ export default function DmRulesPage() {
       )}
 
       <Alert severity="info">
-        <AlertTitle>Aa chalva mate Meta webhook joiye</AlertTitle>
-        Meta ne comment na updates moklva pade. Settings page ma poori setup
-        guide che. <strong>Meta ne public https URL joiye</strong> — localhost
-        nahi chale, etle local testing mate ngrok jevu tunnel vapro.
+        <AlertTitle>This needs a Meta webhook</AlertTitle>
+        Meta has to send comment updates to this app. The Settings page has the
+        full setup guide. <strong>Meta requires a public https URL</strong> —
+        localhost will not work, so use a tunnel such as ngrok while testing.
         <br />
-        <strong>Platform limit:</strong> ek comment dith DM fakt EK vaar
-        mokalay, ane comment thaya na 7 divas ni andar.
+        <strong>Platform limit:</strong> a direct message may be sent only once
+        per comment, and only within seven days of that comment.
       </Alert>
 
       <Card>
@@ -247,7 +247,7 @@ export default function DmRulesPage() {
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Have sudhi koi rule nathi.
+                      No rules yet.
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -322,7 +322,7 @@ export default function DmRulesPage() {
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                      <Tooltip title="Rule test karo">
+                      <Tooltip title="Test this rule">
                         <IconButton
                           size="small"
                           onClick={() => {
@@ -354,8 +354,8 @@ export default function DmRulesPage() {
           <Divider sx={{ mb: 1 }} />
           {events.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-              Have sudhi koi comment aavyu nathi. (Meta webhook set thaya pachi
-              ahiya dekhaashe.)
+              No comments have come in yet. They appear here once the Meta
+              webhook is set up.
             </Typography>
           ) : (
             <TableContainer>
@@ -414,7 +414,7 @@ export default function DmRulesPage() {
               label="Rule name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="e.g. Price puchhe ene DM karo"
+              placeholder="e.g. DM anyone who asks about price"
               fullWidth
             />
 
@@ -469,9 +469,9 @@ export default function DmRulesPage() {
               onChange={(e) => setForm({ ...form, matchType: e.target.value })}
               fullWidth
             >
-              <MenuItem value="any">Koi ek keyword hoy (any)</MenuItem>
-              <MenuItem value="all">Badha keywords hoy (all)</MenuItem>
-              <MenuItem value="exact">Comment exactly match thay</MenuItem>
+              <MenuItem value="any">Any one keyword matches</MenuItem>
+              <MenuItem value="all">All keywords must match</MenuItem>
+              <MenuItem value="exact">The comment matches exactly</MenuItem>
             </TextField>
 
             <Divider>Su karvu</Divider>
@@ -483,7 +483,7 @@ export default function DmRulesPage() {
                   onChange={(e) => setForm({ ...form, useAi: e.target.checked })}
                 />
               }
-              label="AI thi jawab lakho (fixed text ne badle)"
+              label="Write the reply with AI instead of using fixed text"
             />
 
             {form.useAi && (
@@ -493,7 +493,7 @@ export default function DmRulesPage() {
                 onChange={(e) =>
                   setForm({ ...form, aiInstruction: e.target.value })
                 }
-                placeholder="Price puchhe to kaho ke DM ma details moklya che, ane website par lai jao"
+                placeholder="If they ask about price, say the details are in their DMs and point them to the website"
                 multiline
                 minRows={2}
                 fullWidth
@@ -509,7 +509,7 @@ export default function DmRulesPage() {
                   }
                 />
               }
-              label="Comment ni niche jaher ma reply karo"
+              label="Reply publicly under the comment"
             />
             {form.publicReply && !form.useAi && (
               <TextField
@@ -518,7 +518,7 @@ export default function DmRulesPage() {
                 onChange={(e) =>
                   setForm({ ...form, publicReplyText: e.target.value })
                 }
-                placeholder="Aabhar! Ame tamne DM ma details moklya che 📩"
+                placeholder="Thanks! We have sent the details to your inbox."
                 multiline
                 minRows={2}
                 fullWidth
@@ -539,7 +539,7 @@ export default function DmRulesPage() {
                 label="DM text"
                 value={form.dmText}
                 onChange={(e) => setForm({ ...form, dmText: e.target.value })}
-                placeholder="Namaste! Tamara sawal mate aabhar. Aamari price list…"
+                placeholder="Hi! Thanks for asking. Here is our price list…"
                 multiline
                 minRows={3}
                 fullWidth
@@ -548,7 +548,7 @@ export default function DmRulesPage() {
             {form.sendDm && (
               <Stack direction="row" spacing={2}>
                 <TextField
-                  label="DM ma link (optional)"
+                  label="Link to include in the DM (optional)"
                   value={form.dmLinkUrl}
                   onChange={(e) =>
                     setForm({ ...form, dmLinkUrl: e.target.value })
@@ -577,7 +577,7 @@ export default function DmRulesPage() {
                   }
                 />
               }
-              label="Ek user ne fakt ek j vaar DM karo"
+              label="Message each person only once"
             />
           </Stack>
         </DialogContent>
@@ -588,7 +588,7 @@ export default function DmRulesPage() {
             onClick={handleSave}
             disabled={saving || !form.name}
           >
-            {saving ? "Save thai rahyu…" : "Rule banavo"}
+            {saving ? "Saving…" : "Create rule"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -600,14 +600,14 @@ export default function DmRulesPage() {
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Rule test karo — {testRule?.name}</DialogTitle>
+        <DialogTitle>Test rule — {testRule?.name}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Koi comment lakho ane jovo ke aa rule trigger thashe ke nahi.
-            (Meta ne kai moklavama nathi aavtu — fakt matching check thay che.)
+            Type a comment and see whether this rule would trigger. Nothing is
+            sent to Meta — only the matching is checked.
           </Typography>
           <TextField
-            label="Comment lakho"
+            label="Comment text"
             value={testComment}
             onChange={(e) => setTestComment(e.target.value)}
             multiline
@@ -621,7 +621,7 @@ export default function DmRulesPage() {
               sx={{ mt: 2 }}
             >
               <AlertTitle>
-                {testResult.matched ? "Match thayu ✓" : "Match na thayu"}
+                {testResult.matched ? "This comment matches" : "No match"}
               </AlertTitle>
               {testResult.matched && (
                 <Box>
@@ -629,16 +629,16 @@ export default function DmRulesPage() {
                     <Typography variant="body2">
                       <strong>Public reply:</strong>{" "}
                       {testResult.usesAi
-                        ? "(AI banavshe)"
-                        : testResult.publicReplyText || "(text set nathi)"}
+                        ? "(written by AI)"
+                        : testResult.publicReplyText || "(no text set)"}
                     </Typography>
                   )}
                   {testResult.wouldSendDm && (
                     <Typography variant="body2" sx={{ mt: 1 }}>
                       <strong>DM:</strong>{" "}
                       {testResult.usesAi
-                        ? "(AI banavshe)"
-                        : testResult.dmText || "(text set nathi)"}
+                        ? "(written by AI)"
+                        : testResult.dmText || "(no text set)"}
                     </Typography>
                   )}
                 </Box>
@@ -647,14 +647,14 @@ export default function DmRulesPage() {
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setTestRule(null)}>Band karo</Button>
+          <Button onClick={() => setTestRule(null)}>Close</Button>
           <Button
             variant="contained"
             onClick={handleTest}
             disabled={testing || !testComment}
             startIcon={testing ? <CircularProgress size={16} /> : <ScienceIcon />}
           >
-            Test karo
+            Run test
           </Button>
         </DialogActions>
       </Dialog>

@@ -7,6 +7,7 @@ import {
   Box,
   Button,
   Card,
+  CardActionArea,
   CardContent,
   CircularProgress,
   Divider,
@@ -27,6 +28,7 @@ import PageHeader from "@/components/PageHeader";
 import StatusChip from "@/components/StatusChip";
 import SetupChecklist from "@/components/SetupChecklist";
 import { apiFetch } from "@/lib/client";
+import { NAV_SECTIONS } from "@/components/nav-items";
 
 type Stats = {
   accounts: number;
@@ -96,12 +98,55 @@ function StatCard({
   );
 }
 
+/** The four things people reach for most often, straight from the sidebar. */
+const SHORTCUT_HREFS = [
+  "/admin/studio",
+  "/admin/posts",
+  "/admin/accounts",
+  "/admin/automations",
+];
+
+function Shortcuts() {
+  const items = NAV_SECTIONS.flatMap((section) => section.items).filter((item) =>
+    SHORTCUT_HREFS.includes(item.href),
+  );
+
+  return (
+    <Grid container spacing={2}>
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <Grid key={item.href} size={{ xs: 12, sm: 6, md: 3 }}>
+            <Card sx={{ height: "100%" }}>
+              <CardActionArea
+                component={Link}
+                href={item.href}
+                sx={{ height: "100%", p: 2 }}
+              >
+                <Stack spacing={1}>
+                  <Icon fontSize="small" color="primary" />
+                  <Typography variant="subtitle2">{item.label}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {item.hint}
+                  </Typography>
+                </Stack>
+              </CardActionArea>
+            </Card>
+          </Grid>
+        );
+      })}
+    </Grid>
+  );
+}
+
 export default function DashboardClient() {
   const [stats, setStats] = React.useState<Stats | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    apiFetch<Stats>("/api/stats").then(setStats).catch((e) => setError(e.message));
+    apiFetch<Stats>("/api/stats")
+      .then(setStats)
+      .catch((problem) => setError(problem.message));
   }, []);
 
   if (error) {
@@ -111,8 +156,8 @@ export default function DashboardClient() {
         <Alert severity="error">
           {error}
           <Typography variant="body2" sx={{ mt: 1 }}>
-            MongoDB local chalu che ke nahi check karo:{" "}
-            <code>mongodb://127.0.0.1:27017</code>
+            The database lives in the <code>data/</code> folder next to the source
+            code. Check that the folder exists and that the app can write to it.
           </Typography>
         </Alert>
       </Stack>
@@ -131,10 +176,10 @@ export default function DashboardClient() {
     <Stack spacing={3}>
       <PageHeader
         title="Dashboard"
-        subtitle="Tamara marketing automation nu overview"
+        subtitle="Everything your marketing automation is doing right now."
         action={
-          <Button component={Link} href="/admin/posts" variant="contained">
-            Navo post banavo
+          <Button component={Link} href="/admin/studio" variant="contained">
+            Create a reel
           </Button>
         }
       />
@@ -176,18 +221,20 @@ export default function DashboardClient() {
         </Grid>
       </Grid>
 
+      <Shortcuts />
+
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 7 }}>
           <Card sx={{ height: "100%" }}>
             <CardContent>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 <ScheduleIcon fontSize="small" color="info" />
-                <Typography variant="h6">Aavnara scheduled posts</Typography>
+                <Typography variant="h6">Scheduled next</Typography>
               </Stack>
               <Divider sx={{ mb: 1 }} />
               {stats.upcoming.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                  Have koi post schedule thayelo nathi.
+                  Nothing is scheduled yet.
                 </Typography>
               ) : (
                 <List dense disablePadding>
@@ -198,7 +245,7 @@ export default function DashboardClient() {
                         secondary={`${post.account?.displayName ?? post.platform} · ${new Date(
                           post.scheduledAt,
                         ).toLocaleString()}`}
-                        primaryTypographyProps={{ fontSize: 14 }}
+                        slotProps={{ primary: { fontSize: 14 } }}
                       />
                     </ListItem>
                   ))}
@@ -213,25 +260,21 @@ export default function DashboardClient() {
             <CardContent>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 <ErrorIcon fontSize="small" color="warning" />
-                <Typography variant="h6">Post status</Typography>
+                <Typography variant="h6">Posts by status</Typography>
               </Stack>
               <Divider sx={{ mb: 2 }} />
               <Stack spacing={1.5}>
-                {(["draft", "scheduled", "published", "failed"] as const).map(
-                  (key) => (
-                    <Stack
-                      key={key}
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
-                    >
-                      <StatusChip status={key} />
-                      <Typography variant="subtitle2">
-                        {stats.posts[key]}
-                      </Typography>
-                    </Stack>
-                  ),
-                )}
+                {(["draft", "scheduled", "published", "failed"] as const).map((key) => (
+                  <Stack
+                    key={key}
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <StatusChip status={key} />
+                    <Typography variant="subtitle2">{stats.posts[key]}</Typography>
+                  </Stack>
+                ))}
               </Stack>
             </CardContent>
           </Card>
@@ -246,7 +289,7 @@ export default function DashboardClient() {
           <Divider sx={{ mb: 1 }} />
           {stats.recentLogs.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-              Have sudhi koi activity nathi.
+              Nothing has happened yet.
             </Typography>
           ) : (
             <List dense disablePadding>
@@ -262,7 +305,7 @@ export default function DashboardClient() {
                     <ListItemText
                       primary={log.message}
                       secondary={`${log.action} · ${new Date(log.createdAt).toLocaleString()}`}
-                      primaryTypographyProps={{ fontSize: 14 }}
+                      slotProps={{ primary: { fontSize: 14 } }}
                     />
                   </Stack>
                 </ListItem>

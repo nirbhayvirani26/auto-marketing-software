@@ -21,5 +21,5 @@ export const openrouterProvider = createOpenAiCompatProvider({
   // Free models badha json_schema support nathi karta — fallback andar j che.
   supportsJsonSchema: false,
   missingKeyHint:
-    "OPENROUTER_API_KEY set nathi. openrouter.ai/keys par thi FREE key lo.",
+    "OPENROUTER_API_KEY is not set. Get a free key at openrouter.ai/keys.",
 });

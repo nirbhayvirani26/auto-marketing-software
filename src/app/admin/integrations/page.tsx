@@ -136,7 +136,7 @@ export default function IntegrationsPage() {
   }
 
   async function revoke(id: string) {
-    if (!confirm("Aa token revoke karvo che? Je service e vapre che e band thai jashe.")) return;
+    if (!confirm("Revoke this token? Any service using it will stop working.")) return;
     try {
       await apiFetch(`/api/tokens?id=${id}`, { method: "DELETE" });
       load();
@@ -168,7 +168,7 @@ export default function IntegrationsPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Integrations & API"
-        subtitle="n8n jodo, API tokens banavo, ane AI tools test karo"
+        subtitle="Connect n8n, issue API tokens, and check that every AI service really works."
       />
 
       {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
@@ -185,7 +185,7 @@ export default function IntegrationsPage() {
             <Box>
               <Typography variant="h6">AI tools test</Typography>
               <Typography variant="body2" color="text.secondary">
-                Badha AI tools ne kharekhar chalavine check kare che
+                Runs every AI service for real and reports what works
               </Typography>
             </Box>
             <Button
@@ -194,7 +194,7 @@ export default function IntegrationsPage() {
               onClick={runSelfTest}
               disabled={testing}
             >
-              {testing ? "Test chali rahyu che…" : "Badha AI tools test karo"}
+              {testing ? "Running tests…" : "Test every AI service"}
             </Button>
           </Stack>
 
@@ -211,7 +211,7 @@ export default function IntegrationsPage() {
                   {testResult.free ? " · FREE" : ""} ·{" "}
                   {(testResult.totalMs / 1000).toFixed(1)}s
                 </AlertTitle>
-                {testResult.failed > 0 && "Niche vigat jovo."}
+                {testResult.failed > 0 && "See the details below."}
               </Alert>
 
               <Stack spacing={1.5}>
@@ -260,7 +260,7 @@ export default function IntegrationsPage() {
             <Box>
               <Typography variant="h6">API tokens</Typography>
               <Typography variant="body2" color="text.secondary">
-                n8n ke biji koi service ne aa app saathe jodva mate
+                For connecting n8n, or any other service, to this app
               </Typography>
             </Box>
             <Button
@@ -281,7 +281,7 @@ export default function IntegrationsPage() {
 
           {newToken && (
             <Alert severity="success" sx={{ mt: 2 }} onClose={() => setNewToken(null)}>
-              <AlertTitle>Token banyo — aa EK j vaar dekhaashe</AlertTitle>
+              <AlertTitle>Token created — this is the only time it is shown</AlertTitle>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Box
                   component="code"
@@ -321,7 +321,7 @@ export default function IntegrationsPage() {
                     <TableRow>
                       <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
-                          Koi token nathi.
+                          No tokens yet.
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -367,34 +367,34 @@ export default function IntegrationsPage() {
           <Divider sx={{ mb: 2 }} />
 
           <Typography variant="subtitle2" gutterBottom>
-            1. Ready workflows import karo
+            1. Import the ready-made workflows
           </Typography>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            Repo na <code>n8n/</code> folder ma 3 workflows che — n8n ma{" "}
-            <strong>Import from File</strong> karo:
+            The <code>n8n/</code> folder holds three workflows. In n8n, choose{" "}
+            <strong>Import from File</strong>:
           </Typography>
           <Stack spacing={0.5} sx={{ mb: 3 }}>
             <Typography variant="body2">
-              • <code>1-scheduler.json</code> — har minute due posts publish kare
+              • <code>1-scheduler.json</code> — publishes due posts every minute
             </Typography>
             <Typography variant="body2">
-              • <code>2-daily-ai-post.json</code> — roj AI post banavine FB+IG par moklе
+              • <code>2-daily-ai-post.json</code> — writes a daily AI post and sends it to Facebook and Instagram
             </Typography>
             <Typography variant="body2">
-              • <code>3-comment-to-dm.json</code> — comment aave to AI jawab + DM
+              • <code>3-comment-to-dm.json</code> — answers new comments with AI and sends a DM
             </Typography>
           </Stack>
 
           <Typography variant="subtitle2" gutterBottom>
-            2. n8n ma aa credentials nakho
+            2. Add these credentials in n8n
           </Typography>
           <Code>{`AM_BASE_URL = ${base}
-AM_TOKEN    = amk_...   (uper thi banavo)`}</Code>
+AM_TOKEN    = amk_...   (create one above)`}</Code>
 
           <Typography variant="subtitle2" sx={{ mt: 3 }} gutterBottom>
             3. Endpoints
           </Typography>
-          <Code>{`# AI thi post banavo ane FB+IG par publish karo
+          <Code>{`# Write a post with AI and publish it to Facebook and Instagram
 POST ${base}/api/v1/posts
 Authorization: Bearer amk_...
 {
@@ -403,18 +403,18 @@ Authorization: Bearer amk_...
   "publish": true
 }
 
-# Fakt caption banavo (save na karo)
+# Write a caption only, without saving it
 POST ${base}/api/v1/generate
 { "topic": "...", "platform": "instagram", "variants": 3 }
 
-# Comment no AI jawab banavo
+# Write an AI reply to a comment
 PUT ${base}/api/v1/generate
 { "comment": "price?", "platform": "instagram" }
 
-# Accounts ni list
+# List the connected accounts
 GET ${base}/api/v1/accounts
 
-# Draft/batch publish karo
+# Publish a draft or a whole batch
 POST ${base}/api/v1/publish
 { "batchId": "..." }
 
@@ -430,7 +430,7 @@ PUT ${base}/api/v1/publish
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
-              label="Token nu naam"
+              label="Token name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="e.g. n8n production"
@@ -471,7 +471,7 @@ PUT ${base}/api/v1/publish
             onClick={createToken}
             disabled={saving || !form.name || form.scopes.length === 0}
           >
-            {saving ? "Banai rahyu…" : "Token banavo"}
+            {saving ? "Creating…" : "Create token"}
           </Button>
         </DialogActions>
       </Dialog>

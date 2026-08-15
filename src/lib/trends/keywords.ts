@@ -76,19 +76,60 @@ export async function googleAutocomplete(
   }
 }
 
-/** Ek seed thi ghana long-tail keywords — "a b c" prefix trick sathe. */
-async function expandKeywords(seeds: string[], geo: string): Promise<string[]> {
+/** Words too common to prove a suggestion is actually about the product. */
+const STOP_WORDS = new Set([
+  "the", "a", "an", "and", "or", "for", "with", "in", "on", "at", "to", "of",
+  "best", "online", "new", "buy", "shop", "price", "near", "me", "top", "your",
+  "everyday", "relaxed", "fit", "wear", "style", "look",
+]);
+
+/** The words that actually identify this product. */
+function contentWords(phrases: Array<string | undefined>): Set<string> {
+  const words = new Set<string>();
+  for (const phrase of phrases) {
+    for (const word of String(phrase ?? "").toLowerCase().split(/[^a-z0-9]+/)) {
+      if (word.length >= 3 && !STOP_WORDS.has(word)) words.add(word);
+    }
+  }
+  return words;
+}
+
+/**
+ * Turns a few seeds into many long-tail keywords, using the autocomplete
+ * prefix trick.
+ *
+ * Suggestions are then filtered back down to those that still mention the
+ * product. Autocomplete happily wanders — seed it with "navy blue cotton
+ * kurta" and it will offer "navyug college surat" — and an unfiltered list
+ * produces hashtags that have nothing to do with what is being sold.
+ */
+async function expandKeywords(
+  seeds: string[],
+  geo: string,
+  anchors: Set<string>,
+): Promise<string[]> {
   const modifiers = ["", " for ", " best ", " online "];
   const jobs: Array<Promise<string[]>> = [];
 
   for (const seed of seeds.slice(0, 4)) {
+    // A long sentence is a poor prefix; keep it to the first few real words.
+    const trimmed = seed.split(/\s+/).slice(0, 4).join(" ");
     for (const modifier of modifiers) {
-      jobs.push(googleAutocomplete(`${seed}${modifier}`, geo).catch(() => []));
+      jobs.push(googleAutocomplete(`${trimmed}${modifier}`, geo).catch(() => []));
     }
   }
 
-  const results = await Promise.all(jobs);
-  return dedupe(results.flat());
+  const results = dedupe((await Promise.all(jobs)).flat());
+  if (anchors.size === 0) return results;
+
+  const onTopic = results.filter((phrase) => {
+    const words = phrase.toLowerCase().split(/[^a-z0-9]+/);
+    return words.some((word) => anchors.has(word));
+  });
+
+  // If filtering left almost nothing, the anchors were probably too narrow —
+  // better to hand back the raw list than an empty one.
+  return onTopic.length >= 4 ? onTopic : results;
 }
 
 /* ------------------------------------------------------------------ *
@@ -164,12 +205,22 @@ type HashtagResponse = {
 export type TrendPackOptions = {
   product: Pick<
     ProductIntelligence,
-    "productName" | "category" | "subCategory" | "style" | "occasions" | "targetGender" | "searchKeywords" | "seedHashtags"
+    | "productName"
+    | "category"
+    | "subCategory"
+    | "style"
+    | "occasions"
+    | "targetGender"
+    | "searchKeywords"
+    | "seedHashtags"
+    | "apparelType"
+    | "materials"
+    | "degraded"
   >;
   geo?: string;
-  /** Brand nu potanu hashtag — hamesha chhelle umeray che. */
+  /** The brand's own hashtag, always appended last. */
   brandTag?: string;
-  /** Ketla hashtag joiye (Instagram ni limit 30 che). */
+  /** How many hashtags to return. Instagram allows at most 30. */
   limit?: number;
   platform?: "instagram" | "facebook";
 };
@@ -179,7 +230,11 @@ export async function buildTrendPack(
 ): Promise<TrendPack> {
   const geo = options.geo || process.env.TRENDS_GEO || "IN";
   const product = options.product;
-  const subject = `${product.category}|${product.subCategory}`.toLowerCase();
+  // Keyed on the product too, so two different items in the same category do
+  // not share one cached hashtag ladder.
+  const subject = `${product.category}|${product.subCategory}|${product.productName}`
+    .toLowerCase()
+    .slice(0, 120);
 
   const cached = await readCache("hashtags", subject, geo);
   const sources: string[] = [];
@@ -188,13 +243,45 @@ export async function buildTrendPack(
   let autoKeywords: string[] = cached?.keywords ?? [];
   let daily: string[] = cached?.rising ?? [];
 
+  // When vision could not read the photo there is nothing honest to search
+  // for. Expanding whatever string happens to be around produces confidently
+  // wrong tags — a brand name once expanded to "#mycompanyisnotgivingmysalary"
+  // — so the search step is skipped entirely and only the brand tag is used.
+  if (product.degraded) {
+    const brandTag = options.brandTag?.toLowerCase().replace(/[^a-z0-9_]/g, "");
+    const hashtags: Hashtag[] = brandTag
+      ? [{ tag: brandTag, tier: "branded", reason: "brand" }]
+      : [];
+
+    return {
+      keywords: [],
+      risingTopics: [],
+      hashtags,
+      hashtagLine: hashtags.map((tag) => `#${tag.tag}`).join(" "),
+      sources: ["skipped — the product could not be identified"],
+    };
+  }
+
   if (!cached) {
+    // Placeholder values from normalise() must never become a search seed:
+    // asking Google to expand "General" returns hashtags about general
+    // physicians, which is worse than returning nothing.
+    const placeholder = new Set(["general", "product", "unknown", "other", ""]);
     const seeds = dedupe([
       product.subCategory,
       product.productName,
       product.category,
       ...(product.searchKeywords ?? []).slice(0, 2),
-    ]).filter(Boolean);
+    ]).filter((seed) => seed && !placeholder.has(seed.toLowerCase().trim()));
+
+    const anchors = contentWords([
+      product.productName,
+      product.subCategory,
+      product.category,
+      product.apparelType,
+      ...(product.searchKeywords ?? []),
+      ...(product.materials ?? []),
+    ]);
 
     const [expanded, trending] = await Promise.all([
       runChainSoft<string[]>(
@@ -202,7 +289,7 @@ export async function buildTrendPack(
           {
             name: "google-autocomplete",
             free: true,
-            run: () => expandKeywords(seeds, geo),
+            run: () => expandKeywords(seeds, geo, anchors),
           },
         ],
         { label: "Keyword expansion", timeoutMs: 25_000, retries: 1 },
@@ -286,8 +373,6 @@ export async function buildTrendPack(
       .filter((t) => t.length >= 3 && t.length <= 30)
       .slice(0, limit);
 
-  const seedFallback = clean(product.seedHashtags, 24);
-
   const broad = clean(ai?.broad, 4);
   const medium = clean(ai?.medium, 10);
   const niche = clean(ai?.niche, 12);
@@ -299,11 +384,28 @@ export async function buildTrendPack(
   ];
 
   if (tagged.length < 8) {
-    // AI fail thayu — seed hashtags ne tier aapi ne vaparie.
-    tagged = seedFallback.map((tag, index) => ({
+    // The AI step did not run. Build the ladder from what is still real: the
+    // hashtag seeds the vision pass produced, the phrases people are actually
+    // typing into Google, and the product's own words. Autocomplete needs no
+    // key, so this path stays useful even with every AI account switched off.
+    const fallbackSource = dedupe([
+      ...clean(product.seedHashtags, 24),
+      ...clean(
+        autoKeywords.map((phrase) => phrase.replace(/\s+/g, "")),
+        24,
+      ),
+      ...clean(
+        [product.subCategory, product.category, product.style, ...(product.occasions ?? [])].map(
+          (word) => String(word ?? "").replace(/\s+/g, ""),
+        ),
+        8,
+      ),
+    ]);
+
+    tagged = fallbackSource.map((tag, index) => ({
       tag,
       tier: (index < 4 ? "broad" : index < 12 ? "medium" : "niche") as HashtagTier,
-      reason: "image analysis",
+      reason: "search demand",
     }));
   }
 

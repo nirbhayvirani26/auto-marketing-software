@@ -1,15 +1,36 @@
-import mongoose, {
+import {
+  model,
+  ObjectId,
   Schema,
+  type BaseFields,
   type HydratedDocument,
-  type InferSchemaType,
-  type Model,
-} from "mongoose";
+} from "@/lib/localdb";
 
 /**
- * Ek connected social profile.
- * - facebook  -> pageId + pageAccessToken
- * - instagram -> igUserId (IG Business account) + pageAccessToken
+ * One connected social profile.
+ *   facebook  -> pageId  + accessToken
+ *   instagram -> igUserId (Instagram Business account) + accessToken
  */
+export type SocialAccountDoc = BaseFields & {
+  brand: ObjectId;
+  platform: "facebook" | "instagram";
+  displayName: string;
+  /** Facebook Page ID. */
+  pageId?: string;
+  /** Instagram Business Account ID. */
+  igUserId?: string;
+  /** Long-lived Page access token. Hidden from API responses. */
+  accessToken?: string;
+  tokenExpiresAt?: Date;
+  avatarUrl?: string;
+  status: "connected" | "disconnected" | "error";
+  lastError?: string;
+  createdBy?: ObjectId;
+};
+
+/** A live document, with `save()` attached. */
+export type SocialAccountDocument = HydratedDocument<SocialAccountDoc>;
+
 const SocialAccountSchema = new Schema(
   {
     brand: {
@@ -25,11 +46,8 @@ const SocialAccountSchema = new Schema(
       index: true,
     },
     displayName: { type: String, required: true, trim: true },
-    // Facebook Page ID
     pageId: { type: String, trim: true },
-    // Instagram Business Account ID (IG User ID)
     igUserId: { type: String, trim: true },
-    // Long-lived Page access token (Graph API)
     accessToken: { type: String, select: false },
     tokenExpiresAt: { type: Date },
     avatarUrl: { type: String, trim: true },
@@ -46,7 +64,7 @@ const SocialAccountSchema = new Schema(
 );
 
 SocialAccountSchema.index({ brand: 1, platform: 1 });
-// Ek j Page/IG account ek brand ma be vaar na aavvu joiye.
+// The same Page or Instagram account must not be connected twice to one brand.
 SocialAccountSchema.index(
   { brand: 1, pageId: 1 },
   { unique: true, partialFilterExpression: { pageId: { $type: "string" } } },
@@ -56,13 +74,7 @@ SocialAccountSchema.index(
   { unique: true, partialFilterExpression: { igUserId: { $type: "string" } } },
 );
 
-export type SocialAccountDoc = InferSchemaType<typeof SocialAccountSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
-
-/** DB mathi aavelu jivant document. */
-export type SocialAccountDocument = HydratedDocument<SocialAccountDoc>;
-
-export const SocialAccount: Model<SocialAccountDoc> =
-  (mongoose.models.SocialAccount as Model<SocialAccountDoc>) ||
-  mongoose.model<SocialAccountDoc>("SocialAccount", SocialAccountSchema);
+export const SocialAccount = model<SocialAccountDoc>(
+  "SocialAccount",
+  SocialAccountSchema,
+);

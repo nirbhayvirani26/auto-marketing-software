@@ -43,7 +43,7 @@ export async function publishPost(
   error?: string;
 }> {
   const post = await Post.findById(postId);
-  if (!post) return { ok: false, error: "Post madyo nahi" };
+  if (!post) return { ok: false, error: "Post not found" };
 
   if (post.status === "published") {
     return {
@@ -57,10 +57,15 @@ export async function publishPost(
     "+accessToken",
   );
   if (!account) {
-    post.status = "failed";
-    post.error = "Social account madyu nahi";
+    // A draft created before any account was connected has nothing to publish
+    // to. That is not a failure of the draft — leave it as a draft so it can
+    // be published once an account exists.
+    const reason = post.account
+      ? "That social account no longer exists. Reconnect it, or pick another."
+      : "This draft has no account yet. Connect Instagram or Facebook, then choose one.";
+    post.error = reason;
     await post.save();
-    return { ok: false, error: post.error };
+    return { ok: false, error: reason };
   }
 
   const accessToken = account.accessToken || env.metaDefaultAccessToken;
@@ -203,7 +208,7 @@ async function publishByType(opts: {
   switch (type) {
     case "reel": {
       const videoUrl = post.mediaUrl ?? "";
-      if (!videoUrl) throw new Error("Reel nu video URL nathi");
+      if (!videoUrl) throw new Error("The reel has no video URL");
 
       if (isInstagram) {
         return publishReelToInstagram({
@@ -239,7 +244,7 @@ async function publishByType(opts: {
 
     case "carousel": {
       const urls = (post.mediaUrls ?? []).filter(Boolean);
-      if (urls.length < 2) throw new Error("Carousel mate ochha ma ochhi 2 image joiye");
+      if (urls.length < 2) throw new Error("A carousel needs at least 2 images");
 
       if (isInstagram) {
         return publishCarouselToInstagram({
@@ -266,7 +271,7 @@ async function publishByType(opts: {
 
     case "story": {
       const mediaUrl = post.mediaUrl ?? "";
-      if (!mediaUrl) throw new Error("Story nu media URL nathi");
+      if (!mediaUrl) throw new Error("The story has no media URL");
       const isVideo = post.mediaType === "video";
 
       return isInstagram
@@ -279,7 +284,7 @@ async function publishByType(opts: {
         : isVideo
           ? publishStoryToFacebook({ pageId, accessToken, videoUrl: mediaUrl })
           : Promise.reject(
-              new Error("Facebook Story mate video joiye — image story API thi nathi thati"),
+              new Error("A Facebook Story needs a video — image stories are not available through the API"),
             );
     }
 

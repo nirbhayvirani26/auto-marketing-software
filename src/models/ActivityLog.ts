@@ -1,4 +1,16 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { model, ObjectId, Schema, type BaseFields } from "@/lib/localdb";
+
+/** One line in the audit trail. Everything the app does ends up here. */
+export type ActivityLogDoc = BaseFields & {
+  level: "info" | "success" | "warning" | "error";
+  /** e.g. "post.published", "ai.generate", "automation.run", "n8n.webhook" */
+  action: string;
+  message: string;
+  meta?: unknown;
+  post?: ObjectId;
+  automation?: ObjectId;
+  actor: string;
+};
 
 const ActivityLogSchema = new Schema(
   {
@@ -8,7 +20,6 @@ const ActivityLogSchema = new Schema(
       default: "info",
       index: true,
     },
-    // e.g. "post.published", "ai.generate", "automation.run", "n8n.webhook"
     action: { type: String, required: true, index: true },
     message: { type: String, required: true },
     meta: { type: Schema.Types.Mixed },
@@ -21,26 +32,20 @@ const ActivityLogSchema = new Schema(
 
 ActivityLogSchema.index({ createdAt: -1 });
 
-export type ActivityLogDoc = InferSchemaType<typeof ActivityLogSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
-
-export const ActivityLog: Model<ActivityLogDoc> =
-  (mongoose.models.ActivityLog as Model<ActivityLogDoc>) ||
-  mongoose.model<ActivityLogDoc>("ActivityLog", ActivityLogSchema);
+export const ActivityLog = model<ActivityLogDoc>("ActivityLog", ActivityLogSchema);
 
 export async function logActivity(entry: {
   level?: "info" | "success" | "warning" | "error";
   action: string;
   message: string;
   meta?: unknown;
-  post?: mongoose.Types.ObjectId | string;
-  automation?: mongoose.Types.ObjectId | string;
+  post?: ObjectId | string;
+  automation?: ObjectId | string;
   actor?: string;
 }) {
   try {
-    await ActivityLog.create(entry);
+    await ActivityLog.create(entry as Partial<ActivityLogDoc>);
   } catch {
-    // Logging kadi request ne fail na kare.
+    // Logging must never fail the request that triggered it.
   }
 }

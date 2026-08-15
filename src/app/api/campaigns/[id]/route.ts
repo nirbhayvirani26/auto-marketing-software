@@ -32,7 +32,7 @@ export const PATCH = handle(async (request, { params }) => {
     },
     { new: true },
   );
-  if (!campaign) return fail("Campaign madyu nahi", 404);
+  if (!campaign) return fail("Campaign not found", 404);
   return ok({ id: String(campaign._id) });
 });
 
@@ -45,6 +45,6 @@ export const DELETE = handle(async (_request, { params }) => {
     _id: id,
     brand: ctx.brandId,
   });
-  if (!campaign) return fail("Campaign madyu nahi", 404);
+  if (!campaign) return fail("Campaign not found", 404);
   return ok({ deleted: true });
 });

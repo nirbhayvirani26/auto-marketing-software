@@ -1,25 +1,26 @@
 /**
- * Reel nu music.
+ * Music for the reel.
  *
- * ================== AGATYA NI VAAT — VANCHO ==================
- * Instagram nu "trending song" (je app ma Reels banavta vakhate dekhay che)
- * Graph API thi lagavi SHAKATU NATHI. Meta e music catalog API ma kholyu j
- * nathi — koi pan tool aa kari shakatu nathi, aa aapna code ni kami nathi.
+ * ================== READ THIS FIRST ==================
+ * Instagram's "trending song" — the licensed tracks you see inside the app
+ * while making a Reel — CANNOT be attached through the Graph API. Meta has
+ * never opened the music catalogue. No tool can do this; it is a platform
+ * limitation, not a shortcoming of this code.
  *
- * Etle aapne be vastu aapiye chie:
+ * So the app provides two things instead:
  *
- *   1. VIDEO MA BAKE THAYELU MUSIC — royalty-free / Creative Commons track
- *      je reel ni andar j vagse. Aa 100% auto-post thay che ane copyright
- *      strike no dar nathi.
+ *   1. MUSIC BAKED INTO THE VIDEO — a royalty-free / Creative Commons track
+ *      playing inside the reel itself. This publishes automatically with no
+ *      risk of a copyright strike.
  *
- *   2. TRENDING AUDIO SUCHAV — IG app ma kaya sound shodhva e batavie chie.
- *      Reel publish thaya pachi IG app ma → Edit → Audio → e sound lagavo.
- *      Be tap nu kaam, ane tyare IG no trending-audio boost pan male.
+ *   2. A TRENDING-AUDIO SUGGESTION — which sound to search for in the app.
+ *      After publishing: Instagram → Edit → Audio → apply that sound. Two
+ *      taps, and the trending-audio boost still applies.
  *
- * Music na source (kram ma):
- *   jamendo  — free key, laakho CC track, mood pramane
- *   ccmixter — koi key nahi
- *   local    — tamari potani mp3 (MUSIC_DIR folder ke app ma upload)
+ * Music sources, in order:
+ *   jamendo  — free key, hundreds of thousands of CC tracks, searchable by mood
+ *   ccmixter — no key needed
+ *   local    — your own mp3 files (the MUSIC_DIR folder, or uploaded in the app)
  * ============================================================
  */
 
@@ -159,7 +160,7 @@ async function fromJamendo(
   const usable = (json.results ?? []).filter(
     (t) => t.duration >= minDuration && (t.audiodownload || t.audio),
   );
-  if (usable.length === 0) throw new Error("Jamendo par aa mood no track na madyo");
+  if (usable.length === 0) throw new Error("Jamendo had no track for this mood");
 
   // Popular ma thi random — dar vakhate same song na vage.
   const pick = usable[Math.floor(Math.random() * Math.min(usable.length, 15))];
@@ -258,7 +259,7 @@ async function fromCcMixter(
     })
     .filter((t): t is MusicTrack => t !== null && t.duration >= minDuration);
 
-  if (candidates.length === 0) throw new Error("ccMixter par track na madyo");
+  if (candidates.length === 0) throw new Error("No track was found on ccMixter");
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
@@ -362,7 +363,7 @@ export async function pickMusic(
         },
         {
           name: "ccmixter",
-          label: "ccMixter (key vagar)",
+          label: "ccMixter (no key needed)",
           free: true,
           configured: () => process.env.MEDIA_ALLOW_ANON_HOSTS !== "false",
           run: (signal) => fromCcMixter(options.mood, options.minDuration, signal),
@@ -440,7 +441,7 @@ export function musicStatus() {
       label: "ccMixter",
       free: true,
       configured: process.env.MEDIA_ALLOW_ANON_HOSTS !== "false",
-      note: "Koi key nahi — turant chale.",
+      note: "No key needed — works immediately.",
     },
     {
       key: "local",

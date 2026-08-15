@@ -88,10 +88,10 @@ export const DELETE = handle(async (request) => {
   if ("response" in ctx) return ctx.response;
 
   const id = new URL(request.url).searchParams.get("id");
-  if (!id) return fail("Product id joiye", 400);
+  if (!id) return fail("A product id is required", 400);
 
   const product = await Product.findOneAndDelete({ _id: id, brand: ctx.brandId });
-  if (!product) return fail("Product madyu nahi", 404);
+  if (!product) return fail("Product not found", 404);
 
   return ok({ deleted: true });
 });

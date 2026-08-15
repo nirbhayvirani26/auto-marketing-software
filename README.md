@@ -1,226 +1,272 @@
 # Auto Marketing Software
 
-Product ni **image mukho** — AI baki badhu kare che: product samje, atyare je
-trending che e shodhe, reel no script lakhe, **30-90 second no reel banave**,
-music naakhe, Instagram ane Facebook mate **alag alag caption + hashtags** lakhe,
-ane **auto publish** kare.
+Upload a product photo. The AI does the rest — it reads the photo, finds what
+is trending, writes a script, **builds a 30-90 second reel**, adds music, writes
+**separate captions and hashtags for Instagram and Facebook**, and publishes.
 
-**Stack:** Next.js 15 (App Router) · TypeScript · MUI 7 · MongoDB (Mongoose) ·
-ffmpeg (video render) · Gemini / Groq / OpenRouter / Claude (AI, fallback chain) ·
-Meta Graph API (Instagram + Facebook publishing) · n8n (optional automation)
-
-> ### 🐍 Python version pan che — `python/` folder ma
->
-> **E j feature, pan 100% FREE stack par.** Ghani vastu to KEY VAGAR j
-> chale che: ffmpeg (render), Catbox (hosting), ccMixter (music),
-> **edge-tts** (voiceover — Hindi ane Gujarati sathe), Pollinations
-> (image), Google Trends (keywords). Fakt AI ane Meta mate key joiye,
-> ane e banne pan free che (Groq / Gemini / **Ollama offline**).
->
-> ```bash
-> cd python
-> pip install -r requirements.txt
-> python scripts/fetch_ffmpeg.py && python scripts/fetch_fonts.py
-> python run.py          # → http://localhost:8000
-> ```
->
-> Puri vigat: [`python/README.md`](python/README.md)
+**Stack:** Next.js 15 (App Router) · TypeScript · MUI 7 · **local JSON database
+(no server to install)** · ffmpeg for video · Nano Banana / Gemini / Groq /
+OpenRouter / Claude for AI · Omni for AI video · Meta Graph API for publishing ·
+n8n (optional).
 
 ---
 
-## 🎬 Reel Studio — mukhya feature
+## Quick start
 
-**`/admin/studio`** — ahiya badhu thay che.
+```bash
+npm install
+npm run fonts        # one-time: free fonts for reel text
+npm run dev
+```
 
-### Kevi rite kaam kare che
+Open <http://localhost:3000/login> and sign in:
+
+| | |
+|---|---|
+| Email | `admin@example.com` |
+| Password | `Admin@12345` |
+
+That is the whole setup. There is no database to install and no connection
+string to configure — the first sign-in creates the workspace for you.
+
+To add API keys (all optional to start with): `cp .env.example .env`, fill in
+what you have, and restart. The **Setup** page in the admin panel walks through
+each one and tells you which is worth getting first.
+
+---
+
+## The database is a folder
+
+Every collection is a JSON file in `data/`, right next to the source code:
 
 ```
-   Product ni image upload karo
+data/
+├── users.json
+├── brands.json
+├── posts.json
+├── reel-jobs.json
+├── media-assets.json
+└── .session-secret      ← generated once, signs your sign-in cookies
+```
+
+This is deliberate. Hand someone the project folder and they can run it a
+minute later: no MongoDB, no Docker, no service to keep alive. Zip it, copy it
+to another machine, put it on a USB stick — the app comes with its content.
+
+**What it means in practice**
+
+- **Sharing the code.** `data/` is gitignored, because it holds password hashes
+  and Page access tokens. Whoever clones the repo gets a fresh workspace that
+  seeds itself on first sign-in. Nothing sensitive travels with the code.
+- **Sharing your actual content.** Copy the `data/` and `storage/` folders
+  across as well and the other machine has your brands, posts and reels too.
+- **Starting over.** Delete `data/` and run `npm run seed`.
+- **Backups.** Copy the folder. That is the entire procedure.
+- **Reading it.** The files are formatted JSON. Open one in any editor.
+
+The engine (`src/lib/localdb/`) implements the slice of the MongoDB query
+language this app uses — filters, operators, sorting, projections, `populate()`,
+unique indexes, TTL expiry, and per-field change tracking on `save()`. It has
+its own test suite:
+
+```bash
+npm run test:db      # 86 checks, runs in about a second
+```
+
+---
+
+## The Reel Studio
+
+**`/admin/studio`** — this is where the work happens.
+
+```
+   Upload a product photo
         │
-        ├─ 1. VISION      image joine product samje che: su che, kaya
-        │                 material nu, kona mate, kaya keywords
+        ├─ 1. VISION      reads the photo: what it is, what it is made of,
+        │                 who it is for, which keywords it can rank on
         │
-        ├─ 2. TRENDS      Google Autocomplete + Google Trends + AI thi
-        │                 hashtag "ladder" (moti / vachli / NANI tags)
+        ├─ 2. TRENDS      Google Autocomplete + Google Trends + AI, combined
+        │                 into a hashtag "ladder" (huge / mid / niche tags)
         │
-        ├─ 3. SCRIPT      shot-by-shot plan — hook, product, benefit, CTA
-        │                 pehla 3 second no hook, dar 2-3 second e badlaav
+        ├─ 3. SCRIPT      a shot-by-shot plan — hook, product, benefit, CTA.
+        │                 A hook in the first 3 seconds, a change every 2-3.
         │
-        ├─ 4. IMAGES      je scene mate joiye e AI banave —
-        │                 avatar + tamara kapda sathe (virtual try-on)
+        ├─ 4. IMAGES      Nano Banana generates the scenes it needs —
+        │                 including your avatar wearing your product
         │
-        ├─ 5. MUSIC       mood pramane copyright-free track
+        ├─ 5. MUSIC       a copyright-free track that matches the mood
         │
-        ├─ 6. VOICEOVER   (marji nu) AI awaj
+        ├─ 6. VOICEOVER   optional AI narration
         │
         ├─ 7. RENDER      ffmpeg → 1080×1920 · 30fps · H.264 · AAC
-        │                 Ken Burns, transitions, text overlay, cover image
+        │                 Ken Burns motion, transitions, text overlay, cover
         │
-        ├─ 8. CAPTION     Instagram ane Facebook mate ALAG caption.
-        │                 Lakhya pachi 0-100 ma marks aape che, ochha
-        │                 aave to AI ne fari lakhavay che.
+        ├─ 8. CAPTIONS    a different caption for Instagram and for Facebook.
+        │                 Each is scored 0-100 and rewritten if it scores low.
         │
-        └─ 9. PUBLISH     IG Reels + FB Reels par ek saathe.
-                          Hashtag pehla comment ma. Sauthi saara vakhate
-                          apoaap goothvi shakay.
+        └─ 9. PUBLISH     Instagram Reels and Facebook Reels together.
+                          Hashtags in the first comment, posted at the best time.
 ```
 
-### Su su bane che
+### What you can build
 
-| Su joiye che | Kai rite |
+| What you want | How |
 |---|---|
-| **Ek product ni reel** | Ek image mukho |
-| **Ghana product ni ek j reel** | Ghani image mukho — dareak ne potano beat male che |
-| **Tamari avatar product pehri ne** | Avatars page ma 2-3 photo aapo, pachi automatic |
-| **Koi bija jevi reel** | E reel ni file upload karo — eni STYLE ni nakal thashe (words nahi) |
-| **Instagram ma je jaay e Facebook ma pan** | Automatic — pan alag caption ane alag hashtag count sathe |
+| A reel for one product | Upload one photo |
+| One reel for several products | Upload several — each gets its own beat |
+| Your avatar wearing your product | Add 2-3 photos on the Avatars page, then it is automatic |
+| A reel in the style of another | Upload that reel — its STYLE is copied, not its words |
+| Instagram and Facebook together | Automatic, with a different caption and hashtag count for each |
 
-### ⚠️ Trending song vishe — saachi vaat
+### Nano Banana for images
 
-Instagram nu **licensed trending song** (je app ma Reels banavta vakhate dekhay
-che) **Graph API thi lagavi shakatu NATHI**. Meta e music catalog API ma kholyu
-j nathi — aa koi pan tool kari shakatu nathi, ane aa aapna code ni kami nathi.
+Image generation runs on **Nano Banana** — Google's Gemini 2.5 Flash Image.
+It is the default because it is on the free tier, it reads reference photos,
+and it keeps a face consistent from scene to scene, which is what makes a
+recognisable avatar possible at all.
 
-Etle app be vastu kare che:
+One `GEMINI_API_KEY` covers writing, reading photos, generating images and
+voiceover. Get one free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 
-1. **Reel ni andar copyright-free music bake kare che** (Jamendo / Creative
-   Commons) — aa 100% auto-post thay che ane copyright strike no dar nathi.
-2. **Publish pachi batave che ke IG app ma kayo trending sound shodhvo** —
-   reel → ⋯ → Edit → Audio → suggest karela shabd search karo → Trending
-   filter → sound lagavo. Be tap nu kaam, ane tyare IG no trending-audio
-   boost pan male che.
+If Nano Banana is unavailable the chain falls through to gpt-image-1, then
+Pollinations (which needs no key at all).
 
-### ⚠️ Public URL joiye j che
+### Omni for AI video
 
-Meta na server **tamari file download kare che**. Etle `localhost` kyarey nahi
-chale. Ek karo:
+`AI_VIDEO_ENABLED=true` turns on **Omni** (Gemini Omni Flash) for real motion —
+fabric catching the air, a model turning, the product being used.
 
-- **Cloudinary** (recommended, free 25GB) — `CLOUDINARY_CLOUD_NAME` +
-  `CLOUDINARY_UPLOAD_PRESET`, athva
-- **Potanu domain / ngrok tunnel** — `PUBLIC_MEDIA_BASE_URL=https://...`
+Omni does **not** replace ffmpeg. ffmpeg builds every reel by animating stills,
+which is fast, free and reliable. Omni upgrades the one or two shots that most
+deserve real movement. The route is always:
 
-Ek pan na hoy to app key-vagar na anonymous host (Catbox / tmpfiles) par
-padi jaay che — chalе che, pan file bahar public rahe che ane tmpfiles ni
-file 1 kalak pachi khatam thai jaay che. Production ma
-`MEDIA_ALLOW_ANON_HOSTS=false` karo.
+```
+product photo → scene image → Omni animates that exact image
+```
 
-### Multi-API pipeline — kaam kyarey atkatu nathi
+Generating video straight from text lets the model invent its own version of
+the product, and the fabric, colour and print come out wrong. Building the still
+first and animating *that* keeps the product identical — the only acceptable
+outcome when the video exists to sell the thing.
 
-Dareak bahar na kaam mate provider ni **chain** che. Ek ni free limit lage,
-key khute, ke service down thay to **bijo apoaap** chalu thai jaay che:
+Omni sits on Google's **paid** tier. On a free key it returns HTTP 429 and is
+skipped automatically; reels still render exactly as before.
 
-| Kaam | Chain (free pehla) |
+### About Instagram's trending songs
+
+Instagram's licensed trending audio — the tracks you see inside the app —
+**cannot be attached through the Graph API**. Meta has never opened the music
+catalogue. No tool can do this; it is a platform limitation, not a gap here.
+
+So the app does two things instead:
+
+1. **Bakes a copyright-free track into the reel** (Jamendo / Creative Commons).
+   This publishes automatically with no risk of a copyright strike.
+2. **After publishing, tells you which trending sound to search for** in the
+   Instagram app: reel → ⋯ → Edit → Audio → search the suggested phrase →
+   Trending filter → apply. Two taps, and you still get the trending-audio boost.
+
+### Media needs a public URL
+
+Meta downloads your file **from its own servers**, so `localhost` will never
+work. Pick one:
+
+- **Cloudinary** (recommended, 25GB free) — set `CLOUDINARY_CLOUD_NAME` and
+  `CLOUDINARY_UPLOAD_PRESET`, or
+- **Your own domain or an ngrok tunnel** — set `PUBLIC_MEDIA_BASE_URL`.
+
+With neither, the app falls back to keyless anonymous hosts (Catbox, tmpfiles).
+Those work, but the files are publicly readable and tmpfiles deletes after an
+hour. Set `MEDIA_ALLOW_ANON_HOSTS=false` in production.
+
+### Nothing ever gets stuck
+
+Every external step runs through a provider chain. When one hits its rate limit,
+runs out of credit, or goes down, the next one takes over:
+
+| Job | Chain (free first) |
 |---|---|
-| Lakhan | Gemini → Groq → OpenRouter → Ollama → Claude |
-| Image samajvi | Gemini Vision → Groq → OpenRouter → Claude |
-| Image banavvi | Gemini Image → Pollinations → Replicate |
-| Virtual try-on | IDM-VTON (Replicate) → Gemini Image |
-| Music | Jamendo → ccMixter → tamari mp3 |
+| Writing | Gemini → Groq → OpenRouter → Ollama → Claude |
+| Reading photos | Gemini Vision → Groq → OpenRouter → Claude |
+| Generating images | **Nano Banana** → gpt-image-1 → Pollinations → Replicate |
+| Virtual try-on | IDM-VTON (Replicate) → Nano Banana |
+| AI video | **Omni** |
+| Music | Jamendo → ccMixter → your own mp3s |
 | Voiceover | Gemini TTS → Pollinations → ElevenLabs |
 | Hosting | Cloudinary → ImgBB → Catbox → tmpfiles |
 | Trends | Google Autocomplete + Google Trends + AI |
 
-Sathe: per-provider timeout, exponential backoff + jitter retry, ane
-**circuit breaker** (3 var fail thay to 60 second skip). Halat
-`/admin/setup` par dekhay che.
+Each has a per-provider timeout, exponential backoff with jitter, and a circuit
+breaker (three failures means a 60-second skip). Live status is on `/admin/setup`.
 
-### Set karo ane bhuli jao — reel automation
+**And when every provider is down**, the reel still ships. Vision falls back to
+the description you typed, the script falls back to a template shot list, and
+the captions are assembled from the product facts — plainer, but honest and
+publishable. Nothing is ever invented.
 
-`/admin/automations` → **Su banavvu: Reel**
+### Set it and forget it
 
-Dar divase (ke kalake/athvadiye) Reel Studio ma upload kareli product images
-ma thi **vaari fari** ek lai ne aakhi reel banse — script, music, caption,
-hashtags badhu — ane Instagram + Facebook banne par jate mukai jashe.
-Tamare fakt product ni images ek var upload karvani.
+`/admin/automations` → **Mode: Reel**
 
-> Cron chalu hovo joiye — jovo section 5.
+Every day (or hour, or week) it takes the next product image from your library,
+builds a complete reel — script, music, caption, hashtags — and publishes it to
+Instagram and Facebook. You upload the product photos once.
 
-### Test karo
-
-```bash
-npm run test:services        # badhi API/service KHAREKHAR chale che? (30 sec)
-npm run test:render          # fakt video engine (30 sec)
-npm run test:pipeline        # 10 round × 195 test — offline, koi key vagar
-npm run test:pipeline -- 10 live   # uper nu + kharekhar AI ne puchhe
-```
-
-`npm run test:services` sauthi kaam nu che — e dareak service ne **ek nani
-sachi request** mokle che. "Key set che" ane "key kaam kare che" e be alag
-vaat che (dakhla tarike key barabar hoy pan credit khatam hoy). Ej test
-admin panel ma **Setup page par button** tarike pan che.
+> The scheduler must be running. See section 5.
 
 ---
 
-## 0. Roj chalavva mate (already setup thai gayelu che)
+## Testing
 
 ```bash
-npm run mongo     # terminal 1 — MongoDB
-npm run dev       # terminal 2 — app
+npm run test:db          # local database — 86 checks, ~1s
+npm run test:services    # does every API key ACTUALLY work? ~60s
+npm run test:render      # the video engine on its own, ~30s
+npm run test:pipeline    # the full pipeline, offline, no keys needed
+npm run test:e2e         # a real reel and real marketing posts, end to end
 ```
 
-Pachi <http://localhost:3000/login> → `admin@example.com` / `Admin@12345`
+**`npm run test:services`** is the most useful of these. It sends one small real
+request to every service. "The key is set" and "the key works" are two different
+things — a key can be valid while the account is out of credit. The same checks
+are a button on the Setup page.
 
-Badhu barabar che ke nahi e ek command ma joi lo:
-
-```bash
-npm run test:services
-```
+**`npm run test:e2e`** runs the whole thing for real: it uploads product photos,
+generates a reel through the actual pipeline, and writes Instagram and Facebook
+posts into the database. It stops short of publishing to Meta — a test script
+should never post to your real audience. It reports which provider served each
+step, so when something falls back you can see exactly where.
 
 ---
 
-## 1. Setup (nava machine par)
+## 1. Setup on a new machine
 
 ```bash
 # 1. Dependencies
 npm install
 
-# 2. Env file banavo
-cp .env.example .env        # Windows: copy .env.example .env
-
-# 3. Reel na text mate free fonts (ek j var)
+# 2. Fonts for reel text (one time)
 npm run fonts
 
-# 4. .env ma aa bharo:
-#    MONGODB_URI      -> mongodb://127.0.0.1:27017/auto_marketing
-#    JWT_SECRET       -> koi pan 32+ character no random string
-#    GEMINI_API_KEY   -> aistudio.google.com/apikey  (FREE, sauthi jaruri —
-#                        ek j key thi lakhan + image samajvi + image banavvi
-#                        + voiceover — chaarey kaam thai jaay che)
-#    CLOUDINARY_*     -> cloudinary.com (FREE 25GB) — aa vagar Instagram/
-#                        Facebook par post NAHI thay (Meta ne public URL joiye)
-#    META_APP_ID/SECRET -> developers.facebook.com/apps
-
-# 5. MongoDB local chalu karo, pachi admin user banavo
-npm run seed
-#    ...athva sample campaign + automation saathe:
-npm run seed -- --demo
-
-# 5. App chalu karo
+# 3. Start
 npm run dev
 ```
 
-Have <http://localhost:3000/login> khollo ane `.env` na `SEED_ADMIN_EMAIL` /
-`SEED_ADMIN_PASSWORD` thi login karo.
-
-Dashboard par **Setup checklist** banner dekhaashe je batavse ke su configure
-baaki che (AI key, access token, etc.). Badhu thai jay pachi e aapoaap chupai
-jaay che.
-
-### MongoDB kevi rite chalavvu
-
-Aa machine par MongoDB 8.0 portable `D:\mongodb` ma install thai gayelu che
-(installer ke Docker ni jarur nathi). Chalavva:
+That is enough to sign in and look around. To make it publish, create `.env`:
 
 ```bash
-npm run mongo          # foreground ma chale, band karva Ctrl+C
+cp .env.example .env        # Windows: copy .env.example .env
 ```
 
-Data `D:\mongodb\data` ma save thay che. Biji machine par `MONGO_HOME` env var
-thi path badli shako.
+and fill in, in order of importance:
 
-Baiji rite: [Community Server installer](https://www.mongodb.com/try/download/community)
-(service tarike chale) athva Docker:
-`docker run -d -p 27017:27017 --name mongo mongo:7`
+| Key | Why | Where |
+|---|---|---|
+| `GEMINI_API_KEY` | Writing, vision, **Nano Banana** images, voiceover — one key, four jobs | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (free) |
+| `CLOUDINARY_*` | Without a public URL, nothing can be published to Meta | [cloudinary.com](https://cloudinary.com) (25GB free) |
+| `META_APP_ID` / `META_APP_SECRET` | Instagram and Facebook publishing | [developers.facebook.com/apps](https://developers.facebook.com/apps) |
+
+`.env` is gitignored. Never commit it.
 
 ---
 
@@ -228,81 +274,80 @@ Baiji rite: [Community Server installer](https://www.mongodb.com/try/download/co
 
 ```
 auto-marketing-software/
+├── data/                           # THE DATABASE — one JSON file per collection
+├── storage/                        # uploads, rendered reels, temp render files
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx              # root layout + theme provider
-│   │   ├── page.tsx                # / -> /admin ke /login
-│   │   ├── login/page.tsx          # login screen
 │   │   ├── admin/                  # ---- ADMIN PANEL (protected) ----
-│   │   │   ├── layout.tsx          # sidebar + topbar shell
+│   │   │   ├── layout.tsx          # sidebar + top bar shell
 │   │   │   ├── page.tsx            # Dashboard
-│   │   │   ├── DashboardClient.tsx
-│   │   │   ├── accounts/           # FB/IG accounts connect karo
-│   │   │   ├── campaigns/          # brand voice + keywords group
-│   │   │   ├── posts/              # AI generate, schedule, publish
-│   │   │   ├── automations/        # recurring AI posting rules
-│   │   │   ├── logs/               # activity audit trail
-│   │   │   └── settings/           # setup guides + theme toggle
+│   │   │   ├── setup/              # guided setup and service checks
+│   │   │   ├── studio/             # Reel Studio
+│   │   │   ├── posts/              # write, schedule, publish
+│   │   │   ├── products/           # paste a link, get the details
+│   │   │   ├── avatars/            # the face in your reels
+│   │   │   ├── campaigns/          # brand voice and keyword groups
+│   │   │   ├── automations/        # recurring AI posting
+│   │   │   ├── dm-rules/           # auto reply and auto DM
+│   │   │   ├── accounts/           # connect Facebook and Instagram
+│   │   │   ├── brands/             # one workspace per brand
+│   │   │   ├── integrations/       # API tokens and n8n
+│   │   │   ├── logs/               # audit trail
+│   │   │   └── settings/           # storage, scheduler, Meta setup
 │   │   └── api/                    # ---- REST API ----
-│   │       ├── auth/{login,logout,me}
-│   │       ├── accounts/[id]
-│   │       ├── campaigns/[id]
-│   │       ├── posts/[id]/publish
-│   │       ├── automations/[id]/run
-│   │       ├── ai/generate         # Claude thi caption banave
-│   │       ├── stats               # dashboard numbers
-│   │       ├── logs
-│   │       ├── cron/dispatch       # scheduler tick (secret protected)
-│   │       └── webhooks/n8n        # n8n -> app commands
-│   ├── components/                 # AdminShell, PageHeader, StatusChip
+│   ├── components/                 # AdminShell, PageHeader, nav, status chips
 │   ├── lib/
-│   │   ├── env.ts                  # centralised env access
-│   │   ├── db.ts                   # mongoose connection (cached)
-│   │   ├── auth.ts                 # JWT sign/verify + cookie
-│   │   ├── api.ts                  # route handler helpers
-│   │   ├── client.ts               # browser fetch wrapper
-│   │   ├── ai.ts                   # Claude content generation
-│   │   ├── social.ts               # Meta Graph API calls
-│   │   ├── publisher.ts            # ek post publish karvanu logic
-│   │   ├── automation-runner.ts    # automation execute + next-run math
-│   │   └── n8n.ts                  # outbound events + inbound auth
-│   ├── models/                     # Mongoose schemas
-│   │   ├── User.ts  SocialAccount.ts  Campaign.ts
-│   │   ├── Post.ts  Automation.ts     ActivityLog.ts
-│   ├── theme/
-│   │   ├── theme.ts                # MUI palette (light + dark)
-│   │   └── ThemeRegistry.tsx       # provider + color mode context
-│   └── middleware.ts               # /admin routes protect kare
+│   │   ├── localdb/                # ★ the local database engine
+│   │   │   ├── object-id.ts        #   MongoDB-compatible ids
+│   │   │   ├── schema.ts           #   types, defaults, validation, indexes
+│   │   │   ├── query-engine.ts     #   filters, operators, sorting, updates
+│   │   │   ├── model.ts            #   Model, Query, documents, populate
+│   │   │   ├── storage.ts          #   JSON files, atomic writes
+│   │   │   └── serialize.ts        #   Date and ObjectId round-tripping
+│   │   ├── db.ts                   # bootstrap (just makes sure data/ exists)
+│   │   ├── bootstrap.ts            # first-run seeding
+│   │   ├── ai/                     # provider chain: gemini, groq, claude, …
+│   │   ├── media/image-gen.ts      # Nano Banana, gpt-image-1, try-on
+│   │   ├── video/ai-video.ts       # Omni
+│   │   ├── video/render.ts         # ffmpeg reel rendering
+│   │   ├── reels/                  # the reel pipeline
+│   │   ├── seo/                    # caption writing and scoring
+│   │   ├── trends/                 # keywords, hashtags, music
+│   │   └── pipeline/chain.ts       # timeouts, retries, circuit breaker
+│   ├── models/                     # schemas for the local database
+│   └── middleware.ts               # protects /admin
 ├── scripts/
-│   ├── seed.mts                    # admin user (+ --demo sample data)
-│   └── mongo.mjs                   # local MongoDB chalu kare
-├── n8n/auto-marketing-workflow.json# ready-made n8n workflow
+│   ├── seed.mts                    # owner account (+ --demo sample data)
+│   ├── test-localdb.ts             # database test suite
+│   ├── test-e2e.ts                 # end-to-end reel and post generation
+│   ├── selftest.ts                 # offline pipeline test
+│   └── probe-services.ts           # does every service really work?
 └── .env.example
 ```
 
 ---
 
-## 3. Kaam kevi rite kare che
+## 3. How it fits together
 
 ```
-        ┌─────────────┐   AI caption   ┌────────────┐
-        │ Admin panel │ ─────────────► │  Claude    │
-        └──────┬──────┘                └────────────┘
+        ┌─────────────┐   captions   ┌──────────────┐
+        │ Admin panel │ ───────────► │  AI chain    │
+        └──────┬──────┘              └──────────────┘
                │ save
                ▼
         ┌─────────────┐
-        │  MongoDB    │  posts (draft / scheduled / published)
+        │  data/*.json│  posts (draft / scheduled / published)
         └──────┬──────┘
-               │  scheduledAt vity gayu?
+               │  is scheduledAt in the past?
                ▼
    ┌───────────────────────┐   POST   ┌──────────────────┐
    │ /api/cron/dispatch    │ ───────► │ Meta Graph API   │
-   │ (n8n har minute call) │          │ FB Page / IG     │
+   │ (called every minute) │          │ FB Page / IG     │
    └───────────┬───────────┘          └──────────────────┘
                │ event
                ▼
         ┌─────────────┐
-        │    n8n      │  Slack alert, sheet log, jem joiye tem
+        │    n8n      │  Slack alerts, sheet logs, whatever you need
         └─────────────┘
 ```
 
@@ -312,53 +357,53 @@ auto-marketing-software/
 
 ### Option A — "Connect with Facebook" (recommended)
 
-Ek j click ma tamara badha Pages ane tema jodayela Instagram Business accounts
-aavi jashe — Page ID ke token hathe nakhva nahi pade.
+One click brings in all your Pages and the Instagram Business accounts linked to
+them. No Page IDs or tokens to copy by hand.
 
-1. <https://developers.facebook.com/apps> par app banavo (type: **Business**).
-2. **Facebook Login** product add karo.
-3. Facebook Login → Settings → **Valid OAuth Redirect URIs** ma aa *exact* URL nakho:
+1. Create an app at <https://developers.facebook.com/apps> (type: **Business**).
+2. Add the **Facebook Login** product.
+3. Facebook Login → Settings → **Valid OAuth Redirect URIs** → add this *exact* URL:
    ```
    http://localhost:3000/api/oauth/meta/callback
    ```
-4. Settings → Basic mathi **App ID** ane **App Secret** lai `.env` ma nakho:
+4. Copy **App ID** and **App Secret** from Settings → Basic into `.env`:
    ```
    META_APP_ID=...
    META_APP_SECRET=...
    ```
-5. Dev server restart karo → Admin → **Social Accounts** →
-   **Connect with Facebook** dabavo → Facebook par permission aapo →
-   pacha aavo tyare "kaya accounts connect karva" nu picker khulse.
+5. Restart the dev server → Admin → **Social Accounts** →
+   **Connect with Facebook** → grant permission → a picker appears asking which
+   accounts to connect.
 
-App je permissions mange che: `pages_show_list`, `pages_manage_posts`,
+Permissions requested: `pages_show_list`, `pages_manage_posts`,
 `pages_read_engagement`, `business_management`, `instagram_basic`,
 `instagram_content_publish`.
 
-> App **Development mode** ma hoy tyare fakt app na admin / developer / tester
-> role vada log j login kari shake. Baki na users mate App Review joiye.
+> While the app is in **Development mode**, only people with an admin,
+> developer or tester role can sign in. Everyone else needs App Review.
 
-### Option B — Manual (Meta app vagar)
+### Option B — manual (no Meta app)
 
-Accounts page → **Manual** button. Graph API Explorer mathi:
+Accounts page → **Manual**. From the Graph API Explorer:
 
-- `GET /me/accounts` → **Page ID** ane **Page access token**
+- `GET /me/accounts` → **Page ID** and **Page access token**
 - `GET /{page-id}?fields=instagram_business_account` → **IG User ID**
 
-> ⚠️ Instagram Content Publishing API ne **public https image URL** joiye j
-> che. `localhost` path nahi chale — Cloudinary / S3 / imgur jeva host par
-> image mukine e URL vapro. Facebook mate image optional che.
+> The Instagram Content Publishing API requires a **public https image URL**.
+> A localhost path will not work — host the image on Cloudinary, S3 or similar.
+> Facebook can post without an image.
 
 ---
 
-## 5. Scheduler chalu karo
+## 5. Start the scheduler
 
-Scheduled post ane automation tyare j chale jyare `/api/cron/dispatch` call thay.
+Scheduled posts and automations only run while `/api/cron/dispatch` is called.
 
-**Option A — n8n (recommended):**
-`n8n/auto-marketing-workflow.json` ne n8n ma **Import from File** karo. Ema
-Schedule Trigger (every minute) → HTTP Request node already set che.
+**Option A — n8n (recommended):** import
+`n8n/auto-marketing-workflow.json`. Its Schedule Trigger (every minute) and
+HTTP Request node are already set up.
 
-**Option B — manual / Task Scheduler:**
+**Option B — manual or Task Scheduler:**
 
 ```bash
 curl -X POST http://localhost:3000/api/cron/dispatch \
@@ -369,42 +414,29 @@ curl -X POST http://localhost:3000/api/cron/dispatch \
 
 ## 6. n8n integration
 
-### Local setup — 2 command
+### Local setup — two commands
 
 ```bash
-# ek j vaar: n8n install karo
-npm install -g n8n
-
-# terminal 3 — n8n chalu karo (data .n8n-data/ ma rahe che)
-npm run n8n
-
-# terminal 4 — app saathe jodo (token banave, workflows import + activate kare)
-npm run n8n:setup
+npm install -g n8n     # once
+npm run n8n            # terminal 2 — data lives in .n8n-data/
+npm run n8n:setup      # terminal 3 — connects it to this app
 ```
 
-`npm run n8n:setup` aa badhu jate kare che:
-
-1. App ma login karine **API token** banave ane `.env` ma `N8N_API_TOKEN` save kare
-2. n8n ma **owner account** banave (`.env` na `SEED_ADMIN_*` thi)
-3. `n8n/*.json` na **3 workflows import** kare — token ane secrets bharine
-4. Workflows **activate** kare
-
-Pachi <http://localhost:5678> kholo — badhu taiyar hashe.
-
-> n8n no badho data project ni andar `.n8n-data/` ma rahe che (gitignored),
-> etle restart thay to pan workflows ane credentials jata nathi.
+`npm run n8n:setup` creates an API token and saves it to `.env`, creates the n8n
+owner account, imports the three workflows in `n8n/*.json` with the secrets
+filled in, and activates them. Then open <http://localhost:5678>.
 
 ### App → n8n (outbound events)
 
-App `N8N_WEBHOOK_URL` par POST kare che:
+The app POSTs to `N8N_WEBHOOK_URL`:
 
-| Event | Kyare |
+| Event | When |
 |---|---|
-| `post.created` | navo draft banyo |
-| `post.scheduled` | post schedule thayo |
-| `post.published` | live thai gayo |
-| `post.failed` | publish fail thayu |
-| `automation.completed` | automation run puru thayu |
+| `post.created` | a new draft was made |
+| `post.scheduled` | a post was scheduled |
+| `post.published` | it went live |
+| `post.failed` | publishing failed |
+| `automation.completed` | an automation run finished |
 
 ```json
 {
@@ -416,16 +448,16 @@ App `N8N_WEBHOOK_URL` par POST kare che:
 
 ### n8n → App (inbound commands)
 
-`POST /api/webhooks/n8n` with header `x-n8n-secret: <N8N_WEBHOOK_SECRET>`:
+`POST /api/webhooks/n8n` with the header `x-n8n-secret: <N8N_WEBHOOK_SECRET>`:
 
 ```jsonc
-// AI thi post banavo ane sidho publish karo
+// Write a post with AI and publish it straight away
 { "event": "post.generate", "accountId": "<id>", "topic": "Monsoon sale", "publish": true }
 
-// koi automation chalavo
+// Run an automation
 { "event": "automation.run", "automationId": "<id>" }
 
-// koi draft publish karo
+// Publish an existing draft
 { "event": "post.publish", "postId": "<id>" }
 ```
 
@@ -433,32 +465,33 @@ App `N8N_WEBHOOK_URL` par POST kare che:
 
 ## 7. API reference
 
-| Method | Path | Kaam |
+| Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/auth/login` | Login (JWT cookie set kare) |
-| POST | `/api/auth/logout` | Logout |
-| GET/POST | `/api/accounts` | Social accounts list / manual add |
-| PATCH/DELETE | `/api/accounts/[id]` | Update / delete |
-| GET | `/api/oauth/meta/start` | Facebook OAuth shuru karo |
-| GET | `/api/oauth/meta/callback` | Facebook pacho ahiya mokle |
-| GET/POST | `/api/oauth/meta/pending` | Malela accounts jovo / connect karo |
+| POST | `/api/auth/login` | Sign in (sets a JWT cookie) |
+| POST | `/api/auth/logout` | Sign out |
+| GET/POST | `/api/accounts` | List social accounts, or add one manually |
+| PATCH/DELETE | `/api/accounts/[id]` | Update or remove |
+| GET | `/api/oauth/meta/start` | Begin the Facebook OAuth flow |
+| GET | `/api/oauth/meta/callback` | Where Facebook returns to |
+| GET/POST | `/api/oauth/meta/pending` | Review and connect the accounts found |
 | GET/POST | `/api/campaigns` | Campaigns |
-| GET/POST | `/api/posts` | Posts (`?status=`, `?platform=`, `?batchId=`) — POST ma `accounts[]` aapo to badha par ek saathe |
-| PATCH/DELETE | `/api/posts/[id]` | Edit / delete draft |
-| POST | `/api/posts/[id]/publish` | Have j publish karo |
-| POST | `/api/ai/generate` | Claude thi caption + hashtags |
+| GET/POST | `/api/posts` | Posts (`?status=`, `?platform=`, `?batchId=`) — pass `accounts[]` to post to several at once |
+| PATCH/DELETE | `/api/posts/[id]` | Edit or delete a draft |
+| POST | `/api/posts/[id]/publish` | Publish now |
+| POST | `/api/ai/generate` | Captions and hashtags from AI |
+| POST | `/api/studio/generate` | Start a reel job |
+| GET | `/api/studio/jobs/[id]` | Reel progress |
 | GET/POST | `/api/automations` | Automations |
 | POST | `/api/automations/[id]/run` | Run now |
 | GET | `/api/stats` | Dashboard numbers |
-| GET | `/api/health` | Setup checklist (su configure thayu che) |
-| GET | `/api/logs` | Activity logs |
+| GET | `/api/health` | Setup checklist and storage location |
+| GET | `/api/logs` | Activity log |
 | POST | `/api/cron/dispatch` | Scheduler tick *(cron secret)* |
 | POST | `/api/webhooks/n8n` | n8n commands *(n8n secret)* |
 
-Badha response no shape: `{ "ok": true, "data": … }` athva
-`{ "ok": false, "error": "…" }`.
+Every response is `{ "ok": true, "data": … }` or `{ "ok": false, "error": "…" }`.
 
-### Ek saathe ghana accounts par post
+### Posting to several accounts at once
 
 ```jsonc
 POST /api/posts
@@ -472,9 +505,9 @@ POST /api/posts
 }
 ```
 
-Dareak account mate alag Post document bane che (potano status ane permalink),
-pan badha ek `batchId` thi jodayela rahe che. Ek account fail thay to biju
-atkatu nathi — response ma per-account result pacho aave che:
+Each account gets its own Post document with its own status and permalink, all
+sharing one `batchId`. One failure never blocks the others, and the response
+reports per-account results:
 
 ```jsonc
 {
@@ -482,46 +515,52 @@ atkatu nathi — response ma per-account result pacho aave che:
   "data": {
     "batchId": "5f1c…",
     "created": [ { "id": "…", "account": "My Page", "platform": "facebook" } ],
-    "skipped": [ { "account": "@mybrand", "reason": "Instagram mate public image URL farjiyat che" } ]
+    "skipped": [ { "account": "@mybrand", "reason": "Instagram requires a public image URL" } ]
   }
 }
 ```
 
-UI ma multi-account post ne **multi-account** chip lagelo hoy che, ane
-**Batch** button thi tena badha pending posts ek saathe publish thai jay che.
+In the UI these carry a **multi-account** chip, and the **Batch** button
+publishes every pending post in the group together.
 
 ---
 
 ## 8. Troubleshooting
 
-| Problem | Upay |
+| Problem | Fix |
 |---|---|
-| `ECONNREFUSED 127.0.0.1:27017` | MongoDB band che → `npm run mongo` |
-| Login "Email ke password khoto che" | `npm run seed` fari chalavo (password reset kari de che) |
-| AI generate par "Missing ANTHROPIC_API_KEY" | `.env` ma key nakho, pachi dev server restart karo |
-| "Invalid OAuth access token" | Accounts page ma Page access token khoto/expire thayelo che |
-| Badha page achanak 500 aape | `next dev` chalu hoy tyare `next build` na chalavo — e `.next` bagade che. Fix: dev band karo → `.next` folder delete karo → `npm run dev` |
-| Instagram publish fail | Image/video URL public https hovu joiye; `localhost` nahi chale |
+| Sign-in says "Incorrect email or password" | Run `npm run seed` — it resets the owner password |
+| "No AI provider key is set" | Open `/admin/setup`. The one that matters most is `GEMINI_API_KEY` (free) |
+| "Your prepayment credits are depleted" | The Gemini account is out of credit. Reels still build — vision, script and captions fall back to templates. Top up, or add a Groq key |
+| "Invalid OAuth access token" | The Page access token on the Accounts page is wrong or expired |
+| Instagram publishing fails | The media URL must be public https. `localhost` will not work |
+| Every page suddenly returns 500 | Do not run `next build` while `next dev` is running — it corrupts `.next`. Stop dev, delete `.next`, run `npm run dev` |
+| Want to start completely fresh | Delete `data/` and `storage/`, then `npm run seed` |
 
 ### Reel Studio
 
-| Problem | Upay |
+| Problem | Fix |
 |---|---|
-| Build par `EACCES: permission denied, scandir ...\Temp\...` | Next build system na TEMP ne scan kare che ane tya koi bija app ni lock file hoy to atki jaay che. `npm run build` aa fix kari de che (project ni andar potano temp vaapre che). Sidhu `npx next build` chalavta hoy to aa aavse. |
-| "Ek pan provider configure nathi" | `/admin/setup` khollo — tya dekhashe ke KAI key khute che. Sauthi jaruri: `GEMINI_API_KEY` (free). |
-| Instagram par reel fail — "Media ID is not available" | Video no URL public nathi. `CLOUDINARY_*` naakho ke `PUBLIC_MEDIA_BASE_URL` set karo. |
-| Reel ma text na dekhay / chorasa (□□□) dekhay | `npm run fonts` chalavo. Hindi/Gujarati mate e j font laave che. |
-| Reel banta bahu var lage | `RENDER_CONCURRENCY` vadharo (CPU pramane 3-4), ane `targetDuration` ghatado. Sarerash: 40s ni reel ~2-4 minute. |
-| Job "running" ma atki gayo | Server restart thayo hase. Cron dar minute chale che ane 25 minute pachi ene "failed" kari de che — pachi fari Generate dabavo. |
-| Music na madyu | `JAMENDO_CLIENT_ID` naakho (free), athva `storage/music/` ma potani mp3 mukho. |
-| "Instagram trending song kem nathi lagtu?" | Meta e e API kholelu j nathi — koi tool na kari shake. App reel ma copyright-free music naakhe che ane publish pachi IG app ma trending sound kai rite lagavvo e batave che (2 tap). |
-| Avatar no chehro dareak scene ma badlai jaay | `GEMINI_API_KEY` naakho — Gemini 2.5 Flash Image reference photo samje che. Vadhu saacha result mate `REPLICATE_API_TOKEN` (try-on model). |
+| `EACCES: permission denied, scandir ...\Temp\...` on build | Next's build scans the system TEMP folder and trips over another app's lock file. `npm run build` avoids this by using a temp folder inside the project. Running `npx next build` directly will hit it |
+| "No provider is configured" | Open `/admin/setup` to see which key is missing |
+| Instagram reel fails — "Media ID is not available" | The video URL is not public. Set `CLOUDINARY_*` or `PUBLIC_MEDIA_BASE_URL` |
+| Reel text shows as boxes (□□□) | Run `npm run fonts`. It fetches Hindi and Gujarati fonts too |
+| Reels take a long time | Raise `RENDER_CONCURRENCY` (3-4 depending on CPU) and lower `targetDuration`. A 40-second reel averages 2-4 minutes |
+| A job is stuck at "running" | The server restarted. The cron runs every minute and marks it failed after 25 minutes; then press Generate again |
+| No music was found | Set `JAMENDO_CLIENT_ID` (free), or drop your own mp3 files into `storage/music/` |
+| The avatar's face changes between scenes | Set `GEMINI_API_KEY` — Nano Banana reads the reference photos. For even better results add `REPLICATE_API_TOKEN` (the try-on model) |
+
+---
 
 ## 9. Security notes
 
-- Access token DB ma `select: false` che — API response ma kadi nathi aavtu.
-- `/admin/*` middleware thi protect thayelu che; API routes potano JWT check kare che.
-- `/api/cron/dispatch` ane `/api/webhooks/n8n` shared secret header mange che
-  (session nahi), jethi machine-to-machine call thai sake.
-- Production ma `.env` na secrets badlo ane HTTPS par chalavo (cookie `secure`
-  flag `NODE_ENV=production` ma aapoaap on thai jay che).
+- Access tokens are stored with `select: false` and are never returned by the API.
+- `/admin/*` is protected by middleware; API routes verify their own JWT.
+- `/api/cron/dispatch` and `/api/webhooks/n8n` take a shared-secret header rather
+  than a session, so machine-to-machine calls work.
+- The sign-in key is generated per installation into `data/.session-secret` —
+  no placeholder secret is ever baked into shared source code.
+- `data/` and `.env` are both gitignored. Rotate any key that has previously
+  been committed.
+- In production, change the secrets in `.env` and serve over HTTPS. The cookie's
+  `secure` flag turns on automatically when `NODE_ENV=production`.

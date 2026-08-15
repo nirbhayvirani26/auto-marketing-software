@@ -49,9 +49,9 @@ export async function requireApiToken(
     revokedAt: null,
   });
 
-  if (!token) return { response: fail("Token khoto ke revoke thayelo che", 401) };
+  if (!token) return { response: fail("The token is invalid or has been revoked", 401) };
   if (token.expiresAt && token.expiresAt < new Date()) {
-    return { response: fail("Token expire thai gayo che", 401) };
+    return { response: fail("The token has expired", 401) };
   }
   if (scope && !token.scopes.includes(scope)) {
     return {
@@ -60,7 +60,7 @@ export async function requireApiToken(
   }
 
   const tenant = await loadTenant(token.organization);
-  if (!tenant) return { response: fail("Organization madyu nahi", 404) };
+  if (!tenant) return { response: fail("Organization not found", 404) };
 
   if (!moduleEnabled(tenant, "apiTokens")) {
     return {

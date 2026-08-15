@@ -67,10 +67,10 @@ type Status = {
 };
 
 /**
- * "Reel Studio chalu thai shakshe ke nahi" — ek j najar ma.
+ * Can the Reel Studio actually run? Answered at a glance.
  *
- * Setup page par dekhay che. Dareak jutth ma "aa vagar su nahi chale" pan
- * lakhelu che, jethi user ne khabar pade ke kai key sauthi pehla levi.
+ * Shown on the Setup page. Each group also spells out what stops working
+ * without it, so it is obvious which key to get first.
  */
 export default function StudioReadiness() {
   const [status, setStatus] = React.useState<Status | null>(null);
@@ -99,7 +99,7 @@ export default function StudioReadiness() {
 
   if (error) {
     return (
-      <Alert severity="error">Reel Studio ni halat lavi na shakaya: {error}</Alert>
+      <Alert severity="error">Could not load the Reel Studio status: {error}</Alert>
     );
   }
   if (!status) {
@@ -120,7 +120,7 @@ export default function StudioReadiness() {
           <Chip
             size="small"
             color={status.ready ? "success" : "warning"}
-            label={status.ready ? "Taiyar che" : `${status.blocking.length} vastu khute che`}
+            label={status.ready ? "Ready" : `${status.blocking.length} missing`}
           />
           <Box sx={{ flex: 1 }} />
           {status.runner.running > 0 && (
@@ -134,7 +134,7 @@ export default function StudioReadiness() {
 
         {status.blocking.length > 0 && (
           <Alert severity="warning" sx={{ mb: 2 }}>
-            <AlertTitle>Aa vagar reel nahi bane</AlertTitle>
+            <AlertTitle>Reels cannot be built without these</AlertTitle>
             {status.blocking.map((item) => (
               <Typography key={item.key} variant="body2" sx={{ mt: 0.5 }}>
                 • <strong>{item.title}</strong> — {item.why}
@@ -156,7 +156,7 @@ export default function StudioReadiness() {
                 )}
                 <Typography variant="subtitle2">{group.title}</Typography>
                 {!group.required && (
-                  <Chip size="small" variant="outlined" label="marji nu" sx={{ height: 18 }} />
+                  <Chip size="small" variant="outlined" label="optional" sx={{ height: 18 }} />
                 )}
               </Stack>
 
@@ -186,7 +186,7 @@ export default function StudioReadiness() {
           ))}
         </Stack>
 
-        {/* ---- Kharekhar chale che ke nahi ---- */}
+        {/* ---- Does it actually work? ---- */}
         <Divider sx={{ my: 2 }} />
         <Stack direction="row" alignItems="center" spacing={2}>
           <Button
@@ -196,11 +196,11 @@ export default function StudioReadiness() {
             onClick={runProbe}
             disabled={probing}
           >
-            {probing ? "Test chali rahyu che…" : "Badhu kharekhar chale che? — test karo"}
+            {probing ? "Running tests…" : "Test every service for real"}
           </Button>
           <Typography variant="caption" color="text.secondary">
-            Dareak service ne ek nani sachi request mokle che. Key set hovi ane
-            key <strong>kaam karvi</strong> — e be alag vaat che.
+            Sends one small real request to every service. A key being set and a
+            key <strong>working</strong> are two different things.
           </Typography>
         </Stack>
 
@@ -214,7 +214,7 @@ export default function StudioReadiness() {
                 {probe.passed} pass · {probe.failed} fail
               </AlertTitle>
               {probe.ready
-                ? "Badhu kaam kare che — Reel Studio ma javo ane image mukho."
+                ? "Everything works — open the Reel Studio and upload a photo."
                 : probe.blocking.map((item, index) => (
                     <Typography key={index} variant="body2" sx={{ mt: 0.5 }}>
                       • <strong>{item.label}</strong> — {item.error}
@@ -261,7 +261,7 @@ export default function StudioReadiness() {
           <>
             <Divider sx={{ my: 2 }} />
             <Typography variant="caption" color="text.secondary">
-              Vaar vaar fail thaya etle atyare skip thai rahya che (thodi var
+              These keep failing, so they are being skipped for now (they come
               ma apoaap fari chalu thashe):
             </Typography>
             <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>

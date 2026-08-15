@@ -124,7 +124,7 @@ export default function PostsPage() {
   const hasInstagram = selected.some((a) => a.platform === "instagram");
   const igNeedsImage = hasInstagram && !form.mediaUrl;
 
-  /** Account select thay tyare AI platform aapoaap set thay. */
+  /** Choosing an account sets the AI platform automatically. */
   function handleAccountsChange(ids: string[]) {
     const picked = accounts.filter((a) => ids.includes(a._id));
     const platforms = new Set(picked.map((a) => a.platform));
@@ -200,7 +200,7 @@ export default function PostsPage() {
         <>
           <AlertTitle>
             {result.created.length} account par{" "}
-            {status === "scheduled" ? "schedule thayu" : "draft banyu"}
+            {status === "scheduled" ? "scheduled" : "saved as a draft"}
           </AlertTitle>
           {result.created.map((entry) => entry.account).join(", ")}
           {result.skipped.length > 0 && (
@@ -267,7 +267,7 @@ export default function PostsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Aa post delete karvo che?")) return;
+    if (!confirm("Delete this post?")) return;
     try {
       await apiFetch(`/api/posts/${id}`, { method: "DELETE" });
       load();
@@ -280,14 +280,14 @@ export default function PostsPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Posts"
-        subtitle="Ek caption, ghana accounts — AI thi banavo ane ek saathe publish karo"
+        subtitle="One caption, many accounts. Write it with AI and publish everywhere at once."
         action={
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setOpen(true)}
           >
-            Navo post
+            New post
           </Button>
         }
       />
@@ -326,7 +326,7 @@ export default function PostsPage() {
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Aa filter ma koi post nathi.
+                      No posts match this filter.
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -423,7 +423,7 @@ export default function PostsPage() {
                   <TableCell align="right">
                     <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                       {post.permalink && (
-                        <Tooltip title="Live post jovo">
+                        <Tooltip title="View the live post">
                           <IconButton
                             size="small"
                             component="a"
@@ -436,7 +436,7 @@ export default function PostsPage() {
                         </Tooltip>
                       )}
                       {post.batchId && post.status !== "published" && (
-                        <Tooltip title="Aa batch na badha accounts par publish karo">
+                        <Tooltip title="Publish to every account in this batch">
                           <span>
                             <Button
                               size="small"
@@ -453,7 +453,7 @@ export default function PostsPage() {
                         </Tooltip>
                       )}
                       {post.status !== "published" && (
-                        <Tooltip title="Have j publish karo">
+                        <Tooltip title="Publish now">
                           <span>
                             <IconButton
                               size="small"
@@ -485,11 +485,11 @@ export default function PostsPage() {
       </Card>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>Navo post — ek ke ghana accounts par</DialogTitle>
+        <DialogTitle>New post — to one or more accounts</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <FormControl fullWidth>
-              <InputLabel id="accounts-label">Accounts (ghana select karo)</InputLabel>
+              <InputLabel id="accounts-label">Accounts (choose one or more)</InputLabel>
               <Select
                 labelId="accounts-label"
                 multiple
@@ -501,7 +501,7 @@ export default function PostsPage() {
                       : e.target.value,
                   )
                 }
-                input={<OutlinedInput label="Accounts (ghana select karo)" />}
+                input={<OutlinedInput label="Accounts (choose one or more)" />}
                 renderValue={(ids) => (
                   <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
                     {accounts
@@ -525,7 +525,7 @@ export default function PostsPage() {
               >
                 {accounts.length === 0 && (
                   <MenuItem disabled>
-                    Pehla Accounts page ma account connect karo
+                    Connect an account on the Social Accounts page first
                   </MenuItem>
                 )}
                 {accounts.map((account) => (
@@ -552,7 +552,7 @@ export default function PostsPage() {
               onChange={(e) => setForm({ ...form, campaign: e.target.value })}
               fullWidth
             >
-              <MenuItem value="">— koi nahi —</MenuItem>
+              <MenuItem value="">— none —</MenuItem>
               {campaigns.map((campaign) => (
                 <MenuItem key={campaign._id} value={campaign._id}>
                   {campaign.name}
@@ -562,12 +562,12 @@ export default function PostsPage() {
 
             {igNeedsImage && (
               <Alert severity="warning">
-                Instagram account select karyu che — niche <strong>Image URL</strong>{" "}
-                nakho, nahi to fakt Facebook accounts par j post jashe.
+                An Instagram account is selected, so the <strong>Image URL</strong>{" "}
+                below is required — without it only the Facebook accounts will receive the post.
               </Alert>
             )}
 
-            <Divider>AI thi generate karo</Divider>
+            <Divider>Generate with AI</Divider>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <TextField
@@ -612,7 +612,7 @@ export default function PostsPage() {
             {variants.length > 1 && (
               <Stack spacing={1}>
                 <Typography variant="caption" color="text.secondary">
-                  {variants.length} variants — click karine select karo
+                  {variants.length} variants — click one to use it
                 </Typography>
                 <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 1 }}>
                   {variants.map((variant, index) => (
@@ -667,8 +667,8 @@ export default function PostsPage() {
               onChange={(e) => setForm({ ...form, mediaUrl: e.target.value })}
               helperText={
                 hasInstagram
-                  ? "Instagram mate farjiyat — public https URL (localhost nahi chale)"
-                  : "Optional — image saathe post karva mate"
+                  ? "Required for Instagram — a public https URL (localhost will not work)"
+                  : "Optional — include an image with the post"
               }
               fullWidth
             />
@@ -690,7 +690,7 @@ export default function PostsPage() {
             onClick={() => handleSave("draft")}
             disabled={saving || !form.caption || form.accounts.length === 0}
           >
-            Draft save karo ({form.accounts.length})
+            Save draft ({form.accounts.length})
           </Button>
           <Button
             variant="contained"
@@ -702,7 +702,7 @@ export default function PostsPage() {
               !form.scheduledAt
             }
           >
-            Schedule karo ({form.accounts.length})
+            Schedule ({form.accounts.length})
           </Button>
         </DialogActions>
       </Dialog>

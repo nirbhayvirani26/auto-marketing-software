@@ -24,7 +24,7 @@ export const PATCH = handle(async (request, { params }) => {
   const body = updateSchema.parse(await request.json());
 
   const automation = await Automation.findOne({ _id: id, brand: ctx.brandId });
-  if (!automation) return fail("Automation madyu nahi", 404);
+  if (!automation) return fail("Automation not found", 404);
 
   Object.assign(automation, {
     ...body,
@@ -56,6 +56,6 @@ export const DELETE = handle(async (_request, { params }) => {
     _id: id,
     brand: ctx.brandId,
   });
-  if (!automation) return fail("Automation madyu nahi", 404);
+  if (!automation) return fail("Automation not found", 404);
   return ok({ deleted: true });
 });

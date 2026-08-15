@@ -17,14 +17,14 @@ const STEP_WEIGHT: Record<string, number> = {
   copy: 8,
 };
 
-/** Ek reel job ni puri halat — UI dar 3 second e aa puche che. */
+/** The full state of one reel job — the UI polls this every few seconds. */
 export const GET = handle(async (_request, ctx) => {
   const auth = await requireBrand();
   if ("response" in auth) return auth.response;
 
   const { id } = await ctx.params;
   const job = await ReelJob.findOne({ _id: id, brand: auth.brandId }).lean();
-  if (!job) return fail("Reel job madyo nahi", 404);
+  if (!job) return fail("Reel job not found", 404);
 
   const [output, thumbnail] = await Promise.all([
     job.output ? MediaAsset.findById(job.output).lean() : null,
@@ -63,6 +63,7 @@ export const GET = handle(async (_request, ctx) => {
       error: step.error,
     })),
     error: job.error,
+    warnings: job.warnings ?? [],
 
     duration: job.duration,
     videoUrl: output?.publicUrl ?? (output ? `/api/media/${output._id}` : null),
@@ -89,7 +90,7 @@ export const DELETE = handle(async (_request, ctx) => {
 
   const { id } = await ctx.params;
   const job = await ReelJob.findOneAndDelete({ _id: id, brand: auth.brandId });
-  if (!job) return fail("Reel job madyo nahi", 404);
+  if (!job) return fail("Reel job not found", 404);
 
   return ok({ deleted: true });
 });

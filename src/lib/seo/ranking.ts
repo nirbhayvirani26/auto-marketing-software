@@ -63,52 +63,52 @@ export function scoreCaption(input: {
   const checks: CaptionCheck[] = [
     {
       id: "hook-length",
-      label: "Pehli line 40-90 akshar ni che",
+      label: "The first line is 40-90 characters",
       weight: 12,
       passed: firstLine.length >= 25 && firstLine.length <= 100,
-      hint: "Instagram 'more' pehla fakt pehli line batave che — e j hook che.",
+      hint: "Instagram shows only the first line before 'more' — that line is the hook.",
     },
     {
       id: "keyword-in-hook",
-      label: "Mukhya keyword pehla 125 akshar ma che",
+      label: "The main keyword appears in the first 125 characters",
       weight: 18,
       passed: Boolean(primary) && hook.includes(primary),
-      hint: "IG search caption na shuru na shabdo ne sauthi vadhu vajan aape che.",
+      hint: "Instagram search weights the opening words of a caption most heavily.",
     },
     {
       id: "keyword-density",
-      label: "Bija keywords pan caption ma vanayela che",
+      label: "Other keywords are woven in as well",
       weight: 12,
       passed: keywordHits >= 2,
-      hint: "2-4 related keywords sahaj rite naakho — thoosi ne nahi.",
+      hint: "Weave in 2-4 related keywords naturally — do not stuff them.",
     },
     {
       id: "no-weak-opener",
-      label: "Kantaadi naakhe evi shuruaat nathi",
+      label: "It does not open with a cliché",
       weight: 10,
       passed: !WEAK_OPENERS.some((phrase) => lower.startsWith(phrase)),
-      hint: "'Introducing...' / 'Check out our...' thi scroll atkato nathi.",
+      hint: "'Introducing…' and 'Check out our…' do not stop anyone scrolling.",
     },
     {
       id: "cta",
-      label: "Spashta call-to-action che",
+      label: "There is a clear call to action",
       weight: 14,
       passed: CTA_WORDS.some((word) => lower.includes(word)),
-      hint: "Comment/Save/Share magto CTA — aa traney signal ranking vadhare che.",
+      hint: "Ask for a comment, save or share — all three lift ranking.",
     },
     {
       id: "length",
-      label: "Lambai barabar che",
+      label: "Length is right",
       weight: 10,
       passed:
         input.platform === "instagram"
           ? words.length >= 20 && words.length <= 150
           : words.length >= 15 && words.length <= 120,
-      hint: "Bahu tunku = ochi mahiti, bahu lambu = koi vanchtu nathi.",
+      hint: "Too short says nothing; too long and nobody reads it.",
     },
     {
       id: "hashtag-count",
-      label: "Hashtag ni sankhya barabar che",
+      label: "The hashtag count is right",
       weight: 10,
       passed:
         input.platform === "instagram"
@@ -121,27 +121,27 @@ export function scoreCaption(input: {
     },
     {
       id: "line-breaks",
-      label: "Fakra ma vahenchayelu che",
+      label: "It is broken into paragraphs",
       weight: 8,
       passed: caption.includes("\n") || words.length < 30,
-      hint: "Ek moto block koi vanchtu nathi — line break naakho.",
+      hint: "Nobody reads one solid block — add line breaks.",
     },
     {
       id: "no-hashtag-in-body",
-      label: "Caption ni andar hashtag bhelsela nathi",
+      label: "No hashtags are mixed into the caption text",
       weight: 6,
       passed: (caption.match(/#/g) ?? []).length <= 1,
-      hint: "Hashtag chhelle alag rakho — vanchvama saral rahe che.",
+      hint: "Keep hashtags at the end, separate from the text — it reads better.",
     },
   ];
 
   if (input.format === "reel") {
     checks.push({
       id: "reel-hook",
-      label: "Reel no hook pehli 3 second mate lakhayo che",
+      label: "The hook is written for the first 3 seconds",
       weight: 10,
       passed: /\?|!|\d/.test(firstLine),
-      hint: "Sawal, aankdo ke chonkavnaru vidhan — reels watch-time par rank thay che.",
+      hint: "A question, a number or a surprising claim — reels rank on watch time.",
     });
   }
 

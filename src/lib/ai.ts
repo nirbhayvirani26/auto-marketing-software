@@ -132,7 +132,7 @@ export async function generatePosts(
   });
 
   if (!Array.isArray(data.posts) || data.posts.length === 0) {
-    throw new Error("AI response ma koi post madyo nahi.");
+    throw new Error("The AI response contained no post.");
   }
 
   return data.posts.map((post) => ({

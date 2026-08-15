@@ -57,12 +57,12 @@ export async function verifyOtp(
   }).sort({ createdAt: -1 });
 
   if (!record) {
-    return { ok: false, error: "Code madyo nahi ke expire thai gayo — navo mangavo" };
+    return { ok: false, error: "That code is wrong or has expired — request a new one" };
   }
 
   if ((record.attempts ?? 0) >= MAX_ATTEMPTS) {
     await record.deleteOne();
-    return { ok: false, error: "Bahu vaar khoto code — navo code mangavo" };
+    return { ok: false, error: "Too many incorrect attempts — request a new code" };
   }
 
   const matches = await bcrypt.compare(code.trim(), record.codeHash);

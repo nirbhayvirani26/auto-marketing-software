@@ -128,7 +128,7 @@ export default function SuperAdminShell({
             <DashboardIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText
-            primary="User panel jovo"
+            primary="Open the user panel"
             primaryTypographyProps={{ fontSize: 13 }}
           />
         </ListItemButton>

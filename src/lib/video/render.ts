@@ -1,18 +1,19 @@
 /**
- * Reel renderer — scenes andar, 1080x1920 mp4 bahar.
+ * The reel renderer — scenes in, a 1080x1920 mp4 out.
  *
- * Kaam be tabakke thay che, jaani joine:
+ * It works in two passes, deliberately:
  *
- *   1. Dareak scene ne alag nani clip tarike render karo
- *   2. Badhi clips ne transition sathe jodo + music/voiceover naakho
+ *   1. Render each scene as its own short clip
+ *   2. Stitch the clips together with transitions, then lay music and
+ *      voiceover over the result
  *
- * Ek j motu filter_complex banavvu shakya che, pan e debug karvu asakya
- * thai jaay che ane ek scene ma bhool hoy to aakhu fail thay. Alag alag
- * karvathi bhool kaya scene ma che e sidhu khabar pade che.
+ * One enormous filter_complex would also work, but it is impossible to debug
+ * and a mistake in a single scene fails the entire render. Splitting the work
+ * means a failure names the scene that caused it.
  *
- * Output Instagram Reels ni spec pramane j che:
+ * The output matches the Instagram Reels specification exactly:
  *   1080x1920 (9:16) · 30fps · H.264 High · yuv420p · AAC 128k 44.1kHz stereo
- *   + faststart (jethi Meta ne aakhi file utaarya vagar j shuru thai jaay)
+ *   plus faststart, so Meta can begin playback without downloading it all.
  */
 
 import { writeFile } from "node:fs/promises";
@@ -499,7 +500,7 @@ export async function renderReel(options: RenderOptions): Promise<RenderResult> 
   const defaultTransition = options.defaultTransition ?? "fade";
 
   const scenes = options.scenes.filter((s) => s.source && s.duration > 0);
-  if (scenes.length === 0) throw new Error("Reel banavva mate ek pan scene nathi");
+  if (scenes.length === 0) throw new Error("There are no scenes to build the reel from");
 
   const fontFile = resolveFont(options.script ?? "latin");
 
@@ -535,7 +536,7 @@ export async function renderReel(options: RenderOptions): Promise<RenderResult> 
 
         completed += 1;
         options.onProgress?.({
-          step: `Scene ${completed}/${scenes.length} taiyar`,
+          step: `Scene ${completed} of ${scenes.length} rendered`,
           done: completed,
           total: scenes.length + 1,
         });

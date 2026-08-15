@@ -63,7 +63,7 @@ export async function runProductCampaign(
     _id: options.productId,
     brand: options.brand._id,
   });
-  if (!product) throw new Error("Product madyu nahi");
+  if (!product) throw new Error("Product not found");
 
   const filter: Record<string, unknown> = {
     brand: options.brand._id,
@@ -73,7 +73,7 @@ export async function runProductCampaign(
 
   const accounts = await SocialAccount.find(filter);
   if (accounts.length === 0) {
-    throw new Error("Ek pan connected account nathi — pehla account jodo");
+    throw new Error("No accounts are connected — connect one first");
   }
 
   const result: ProductCampaignResult = {
@@ -148,7 +148,7 @@ export async function runProductCampaign(
     if (account.platform === "instagram" && !imageUrl) {
       result.skipped.push({
         account: account.displayName,
-        reason: "Instagram mate image joiye — generate fail thayu ane product ma pan image nathi",
+        reason: "Instagram needs an image — generation failed and the product has no photo either",
       });
       continue;
     }

@@ -5,6 +5,7 @@ import { SocialAccount } from "@/models/SocialAccount";
 import { Automation } from "@/models/Automation";
 import { CommentRule } from "@/models/CommentRule";
 import { ReelJob } from "@/models/ReelJob";
+import type { ObjectId } from "@/lib/localdb";
 import { env } from "./env";
 
 export type TenantContext = {
@@ -12,18 +13,22 @@ export type TenantContext = {
   plan: PlanDoc;
 };
 
+/** An id as it arrives from a session, a request body or another document. */
+export type IdInput = ObjectId | string | null | undefined;
+
 /**
- * Module chalu che ke nahi — pehla organization no override jovo, pachi plan.
+ * Is a module switched on? The organization's own override wins; otherwise the
+ * plan decides.
  */
 export function moduleEnabled(ctx: TenantContext, key: ModuleKey): boolean {
-  const override = ctx.organization.moduleOverrides?.get(key);
+  const override = ctx.organization.moduleOverrides?.[key];
   if (typeof override === "boolean") return override;
   return Boolean(ctx.plan.modules?.[key]);
 }
 
-/** Limit value — organization override, nahi to plan. `-1` = unlimited. */
+/** The effective limit: organization override, else plan. `-1` is unlimited. */
 export function limitFor(ctx: TenantContext, key: LimitKey): number {
-  const override = ctx.organization.limitOverrides?.get(key);
+  const override = ctx.organization.limitOverrides?.[key];
   if (typeof override === "number") return override;
   return ctx.plan.limits?.[key] ?? 0;
 }
@@ -31,8 +36,8 @@ export function limitFor(ctx: TenantContext, key: LimitKey): number {
 export type LimitCheck = { allowed: boolean; used: number; limit: number };
 
 /**
- * Atyar sudhi ketlu vaparyu ane limit ma che ke nahi.
- * `postsPerMonth` mahina pramane reset thay che.
+ * How much has been used so far, and whether that is still within the limit.
+ * `postsPerMonth` resets at the start of every calendar month.
  */
 export async function checkLimit(
   ctx: TenantContext,
@@ -42,7 +47,7 @@ export async function checkLimit(
   if (limit === -1) return { allowed: true, used: 0, limit: -1 };
 
   const orgId = ctx.organization._id;
-  const brandIds = await Brand.find({ organization: orgId }).distinct("_id");
+  const brandIds = await Brand.distinct("_id", { organization: orgId });
 
   let used = 0;
   switch (key) {
@@ -62,8 +67,8 @@ export async function checkLimit(
       used = ctx.organization.usage?.postsThisMonth ?? 0;
       break;
     case "reelsPerMonth": {
-      // Reels ne alag ganie chie karan ke ek reel ghana posts banave che
-      // (Instagram + Facebook + biju account) — pan kharch ek j reel no che.
+      // Reels are counted separately from posts: one reel produces several
+      // posts (Instagram, Facebook, other accounts) but costs one render.
       const monthStart = new Date();
       monthStart.setDate(1);
       monthStart.setHours(0, 0, 0, 0);
@@ -81,9 +86,9 @@ export async function checkLimit(
   return { allowed: used < limit, used, limit };
 }
 
-/** Post banya pachi monthly counter vadharo (mahino badlay to reset). */
+/** Bumps the monthly post counter, resetting it when the month rolls over. */
 export async function incrementPostUsage(
-  organizationId: unknown,
+  organizationId: IdInput,
   count = 1,
 ): Promise<void> {
   const org = await Organization.findById(organizationId);
@@ -103,11 +108,11 @@ export async function incrementPostUsage(
 }
 
 /**
- * Organization ni potani API keys, nahi to platform (super admin) ni.
- * Aa thi ek organization potano Anthropic key vapri shake ane baki na
- * platform no key vaapre.
+ * The organization's own API keys when it has them, the platform's otherwise.
+ * This is what lets one organization bring its own Anthropic key while the
+ * rest run on the shared one.
  */
-export async function resolveCredentials(organizationId: unknown): Promise<{
+export async function resolveCredentials(organizationId: IdInput): Promise<{
   anthropicApiKey: string;
   anthropicModel: string;
   metaAppId: string;
@@ -117,7 +122,7 @@ export async function resolveCredentials(organizationId: unknown): Promise<{
   usingOwnKeys: boolean;
 }> {
   const org = await Organization.findById(organizationId).select(
-    "+credentials.anthropicApiKey +credentials.metaAppSecret +credentials.n8nWebhookSecret useOwnKeys credentials",
+    "+credentials.anthropicApiKey +credentials.metaAppSecret +credentials.n8nWebhookSecret",
   );
 
   const own = org?.useOwnKeys ? (org.credentials ?? {}) : {};
@@ -134,9 +139,9 @@ export async function resolveCredentials(organizationId: unknown): Promise<{
   };
 }
 
-/** Organization + eno plan ek saathe lai aave. */
+/** Loads an organization together with its plan. */
 export async function loadTenant(
-  organizationId: unknown,
+  organizationId: IdInput,
 ): Promise<TenantContext | null> {
   const organization = await Organization.findById(organizationId);
   if (!organization) return null;

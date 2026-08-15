@@ -126,14 +126,14 @@ export default function ProductsPage() {
       setManual(null);
       setNotice(
         res.scrapeError
-          ? `"${res.product.title}" add thayu (vigat jate bharvi padse)`
-          : `"${res.product.title}" ni vigat aavi gai`,
+          ? `"${res.product.title}" was added — you will need to fill in the details`
+          : `The details for "${res.product.title}" were imported`,
       );
       load();
     } catch (e) {
       const message = (e as Error).message;
       setError(message);
-      // Scrape fail thayu — user title jate aapi shake.
+      // Scraping failed — the seller can type the title themselves.
       setManual({ title: "" });
     } finally {
       setAdding(false);
@@ -160,7 +160,7 @@ export default function ProductsPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Aa product delete karvu che?")) return;
+    if (!confirm("Delete this product?")) return;
     try {
       await apiFetch(`/api/products?id=${id}`, { method: "DELETE" });
       load();
@@ -173,7 +173,7 @@ export default function ProductsPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Products"
-        subtitle="Product ni link paste karo — vigat, caption, image ane post badhu automatic"
+        subtitle="Paste a product link. The details, caption, image and post are all produced for you."
       />
 
       {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
@@ -187,11 +187,11 @@ export default function ProductsPage() {
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Product ni link paste karo
+            Paste a product link
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Amazon, Flipkart, Shopify, tamari potani site — koi pan product page.
-            Naam, price, description ane images aapoaap aavi jashe.
+            Amazon, Flipkart, Shopify, your own store — any product page. The
+            name, price, description and images are pulled in for you.
           </Typography>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <TextField
@@ -211,19 +211,19 @@ export default function ProductsPage() {
               disabled={adding || !url}
               sx={{ minWidth: 180, height: 40 }}
             >
-              {adding ? "Vigat lai rahyu…" : "Vigat lavo"}
+              {adding ? "Fetching…" : "Fetch details"}
             </Button>
           </Stack>
 
           {manual && (
             <Box sx={{ mt: 2 }}>
               <Alert severity="warning" sx={{ mb: 1 }}>
-                Aa site e vigat na aapi. Product nu naam jate lakho — baki badhu
-                chalse.
+                This site did not return any details. Type the product name and
+                everything else will still work.
               </Alert>
               <Stack direction="row" spacing={2}>
                 <TextField
-                  label="Product nu naam"
+                  label="Product name"
                   value={manual.title}
                   onChange={(e) => setManual({ title: e.target.value })}
                   fullWidth
@@ -233,7 +233,7 @@ export default function ProductsPage() {
                   onClick={() => addProduct(manual.title)}
                   disabled={!manual.title}
                 >
-                  Save karo
+                  Save
                 </Button>
               </Stack>
             </Box>
@@ -248,7 +248,7 @@ export default function ProductsPage() {
             <Card>
               <CardContent sx={{ textAlign: "center", py: 6 }}>
                 <Typography variant="body2" color="text.secondary">
-                  Have sudhi koi product nathi — uper link paste karo.
+                  No products yet — paste a link above to add one.
                 </Typography>
               </CardContent>
             </Card>
@@ -306,7 +306,7 @@ export default function ProductsPage() {
                       setResult(null);
                     }}
                   >
-                    Post banavo
+                    Create post
                   </Button>
                   <Box sx={{ flex: 1 }} />
                   <Tooltip title="Product page kholo">
@@ -337,12 +337,13 @@ export default function ProductsPage() {
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>{target?.title.slice(0, 60)} — post banavo</DialogTitle>
+        <DialogTitle>{target?.title.slice(0, 60)} — create a post</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Alert severity="info">
-              AI Facebook ane Instagram mate <strong>alag alag</strong> caption
-              banavshe, image banavshe, ane caption ma product ni link mukshe.
+              The AI writes a <strong>separate</strong> caption for Facebook and
+              Instagram, generates the image, and puts the product link in the
+              caption.
             </Alert>
 
             <FormControl fullWidth>
@@ -369,7 +370,7 @@ export default function ProductsPage() {
                 }
               >
                 {accounts.length === 0 && (
-                  <MenuItem disabled>Pehla account connect karo</MenuItem>
+                  <MenuItem disabled>Connect an account first</MenuItem>
                 )}
                 {accounts.map((account) => (
                   <MenuItem key={account._id} value={account._id}>
@@ -395,8 +396,8 @@ export default function ProductsPage() {
               onChange={(e) => setForm({ ...form, imageMode: e.target.value })}
               fullWidth
             >
-              <MenuItem value="generate">AI thi navi image banavo (free)</MenuItem>
-              <MenuItem value="product">Product page ni image vapro</MenuItem>
+              <MenuItem value="generate">Generate a new image with AI (free)</MenuItem>
+              <MenuItem value="product">Use the image from the product page</MenuItem>
             </TextField>
 
             <TextField
@@ -413,7 +414,7 @@ export default function ProductsPage() {
                   onChange={(e) => setForm({ ...form, publish: e.target.checked })}
                 />
               }
-              label="Banavine turant publish karo (band rakho to draft raheshe)"
+              label="Publish as soon as it is ready (leave off to keep it as a draft)"
             />
 
             {result && (
@@ -424,7 +425,7 @@ export default function ProductsPage() {
                 {result.created.map((c) => (
                   <Typography key={c.postId} variant="body2">
                     • {c.account} ({c.platform})
-                    {c.published === true && " — publish thayu ✓"}
+                    {c.published === true && " — published"}
                     {c.published === false && ` — fail: ${c.error}`}
                   </Typography>
                 ))}
@@ -447,7 +448,7 @@ export default function ProductsPage() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setTarget(null)} disabled={running}>
-            Band karo
+            Cancel
           </Button>
           <Button
             variant="contained"
@@ -455,7 +456,7 @@ export default function ProductsPage() {
             disabled={running || form.accountIds.length === 0}
             startIcon={running ? <CircularProgress size={16} /> : <RocketIcon />}
           >
-            {running ? "Banai rahyu che…" : form.publish ? "Banavo + Publish" : "Draft banavo"}
+            {running ? "Working…" : form.publish ? "Create and publish" : "Create draft"}
           </Button>
         </DialogActions>
       </Dialog>

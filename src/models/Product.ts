@@ -1,10 +1,34 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { model, ObjectId, Schema, type BaseFields } from "@/lib/localdb";
 
 /**
- * Ek product — eni link paste karo etle vigat aapoaap aavi jaay che,
- * pachi ena parthi AI post ane image bane che, ane comment par jе DM jaay
- * ena ma aa j product ni link mukay che.
+ * A product. Paste its link and the details are pulled in automatically; from
+ * there the AI writes posts and builds images, and the same link is what goes
+ * out in the automated direct messages.
  */
+export type ProductDoc = BaseFields & {
+  brand: ObjectId;
+  /** The link you pasted — this is the one that gets shared. */
+  url: string;
+  title: string;
+  description?: string;
+  price?: number;
+  currency?: string;
+  brandName?: string;
+  availability?: string;
+  siteName?: string;
+  /** Images found on the product page. */
+  images: string[];
+  /** An AI-generated image, hosted at a public URL for Instagram. */
+  generatedImageUrl?: string;
+  imagePrompt?: string;
+  /** How the details were obtained — useful when debugging. */
+  scrapeSource?: string;
+  lastScrapedAt?: Date;
+  scrapeError?: string;
+  active: boolean;
+  createdBy?: ObjectId;
+};
+
 const ProductSchema = new Schema(
   {
     brand: {
@@ -14,7 +38,6 @@ const ProductSchema = new Schema(
       index: true,
     },
 
-    /** Je link paste kari — DM ane post ma aa j jaay che. */
     url: { type: String, required: true, trim: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
@@ -24,13 +47,10 @@ const ProductSchema = new Schema(
     availability: { type: String, trim: true },
     siteName: { type: String, trim: true },
 
-    /** Product page par thi malelі images. */
     images: { type: [String], default: [] },
-    /** AI e banaveli image (Instagram mate public URL). */
     generatedImageUrl: { type: String, trim: true },
     imagePrompt: { type: String, trim: true },
 
-    /** Kai rite vigat madi — debugging mate. */
     scrapeSource: { type: String, trim: true },
     lastScrapedAt: { type: Date },
     scrapeError: { type: String },
@@ -43,10 +63,4 @@ const ProductSchema = new Schema(
 
 ProductSchema.index({ brand: 1, url: 1 }, { unique: true });
 
-export type ProductDoc = InferSchemaType<typeof ProductSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
-
-export const Product: Model<ProductDoc> =
-  (mongoose.models.Product as Model<ProductDoc>) ||
-  mongoose.model<ProductDoc>("Product", ProductSchema);
+export const Product = model<ProductDoc>("Product", ProductSchema);

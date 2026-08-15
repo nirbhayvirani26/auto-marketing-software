@@ -52,7 +52,7 @@ export const POST = handle(async (request) => {
 
   const pending = await PendingConnection.findOne({ user: ctx.session.sub });
   if (!pending) {
-    return fail("Connection session puri thai gai — fari connect karo", 410);
+    return fail("The connection session expired — please connect again", 410);
   }
 
   const saved: string[] = [];

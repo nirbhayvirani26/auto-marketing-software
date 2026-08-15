@@ -95,7 +95,7 @@ function AccountsInner() {
 
   React.useEffect(load, [load]);
 
-  // OAuth callback `?connect=1` ke `?error=…` saathe pacho mokle che.
+  // The OAuth callback returns with `?connect=1` or `?error=…`.
   React.useEffect(() => {
     const oauthError = params.get("error");
     if (oauthError) {
@@ -153,7 +153,7 @@ function AccountsInner() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Aa account delete karvu che?")) return;
+    if (!confirm("Disconnect this account?")) return;
     try {
       await apiFetch(`/api/accounts/${id}`, { method: "DELETE" });
       load();
@@ -166,7 +166,7 @@ function AccountsInner() {
     <Stack spacing={3}>
       <PageHeader
         title="Social Accounts"
-        subtitle="Facebook thi login karo — Pages ane Instagram accounts aapoaap madi jashe"
+        subtitle="Sign in with Facebook and your Pages and Instagram accounts are pulled in automatically."
         action={
           <Stack direction="row" spacing={1}>
             <Button
@@ -196,10 +196,10 @@ function AccountsInner() {
       )}
 
       <Alert severity="info">
-        <strong>Connect with Facebook</strong> ek j vaar ma tamara badha Pages
-        ane tema jodayela Instagram Business accounts lai aave che — Page ID ke
-        token hathe nakhva nathi padta. (Aa mate <code>META_APP_ID</code> ane{" "}
-        <code>META_APP_SECRET</code> .env ma joiye.)
+        <strong>Connect with Facebook</strong> brings in all of your Pages
+        and the Instagram Business accounts linked to them — no Page IDs or
+        tokens to copy by hand. (This needs <code>META_APP_ID</code> and{" "}
+        <code>META_APP_SECRET</code> in your .env.)
       </Alert>
 
       <Card>
@@ -219,7 +219,7 @@ function AccountsInner() {
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Have sudhi koi account connect nathi thayu.
+                      No accounts are connected yet.
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -273,14 +273,14 @@ function AccountsInner() {
         </TableContainer>
       </Card>
 
-      {/* ---- OAuth pachi: kaya accounts connect karva? ---- */}
+      {/* ---- After OAuth: which accounts should be connected? ---- */}
       <Dialog
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Kaya accounts connect karva che?</DialogTitle>
+        <DialogTitle>Choose accounts to connect</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 1 }}>
             Tamara Facebook account ma {discovered.length} account madya.
@@ -316,7 +316,7 @@ function AccountsInner() {
                   primary={account.displayName}
                   secondary={
                     account.alreadyConnected
-                      ? `${account.platform} · pehla thi connected (token update thashe)`
+                      ? `${account.platform} · already connected (the token will be refreshed)`
                       : account.platform
                   }
                 />
@@ -332,7 +332,7 @@ function AccountsInner() {
             disabled={connecting || picked.length === 0}
             startIcon={connecting ? <CircularProgress size={16} /> : undefined}
           >
-            {picked.length} account connect karo
+            Connect {picked.length} account{picked.length === 1 ? "" : "s"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -344,11 +344,11 @@ function AccountsInner() {
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Manual account add karo</DialogTitle>
+        <DialogTitle>Add an account manually</DialogTitle>
         <DialogContent>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Meta app na hoy tyare aa vapro — Graph API Explorer mathi ID ane
-            token levo pade che.
+            Use this when you have no Meta app of your own: take the IDs and the
+            token from the Graph API Explorer.
           </Alert>
           <Stack spacing={2}>
             <TextField
@@ -398,7 +398,7 @@ function AccountsInner() {
               value={form.accessToken}
               onChange={(e) => setForm({ ...form, accessToken: e.target.value })}
               type="password"
-              helperText="DB ma store thashe, UI ma pachu nahi dekhaay"
+              helperText="Stored in the database and never shown again"
               fullWidth
             />
           </Stack>

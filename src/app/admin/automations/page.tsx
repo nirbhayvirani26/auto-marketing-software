@@ -158,7 +158,7 @@ export default function AutomationsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Aa automation delete karvu che?")) return;
+    if (!confirm("Delete this automation?")) return;
     try {
       await apiFetch(`/api/automations/${id}`, { method: "DELETE" });
       load();
@@ -171,14 +171,14 @@ export default function AutomationsPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Automations"
-        subtitle="Schedule par AI post banave ane (chahe to) sidha publish kari de"
+        subtitle="Generate posts with AI on a schedule and, if you want, publish them straight away."
         action={
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setOpen(true)}
           >
-            Automation banavo
+            New automation
           </Button>
         }
       />
@@ -191,9 +191,9 @@ export default function AutomationsPage() {
       )}
 
       <Alert severity="info">
-        Automations chalu rakhva mate <code>/api/cron/dispatch</code> ne har
-        minute call thavu joiye — n8n na Schedule Trigger thi (recommended) ke
-        Windows Task Scheduler thi. Details Settings page ma che.
+        Automations only run while <code>/api/cron/dispatch</code> is called every
+        minute — from an n8n Schedule Trigger (recommended) or from Windows Task
+        Scheduler. The Settings page has the details.
       </Alert>
 
       <Card>
@@ -215,7 +215,7 @@ export default function AutomationsPage() {
                 <TableRow>
                   <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Have sudhi koi automation nathi.
+                      No automations yet.
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -269,7 +269,7 @@ export default function AutomationsPage() {
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                      <Tooltip title="Have j chalavo">
+                      <Tooltip title="Run now">
                         <span>
                           <IconButton
                             size="small"
@@ -313,17 +313,17 @@ export default function AutomationsPage() {
             >
               <MenuItem value="post">Post — AI caption (+ image)</MenuItem>
               <MenuItem value="reel">
-                Reel — aakhi reel banavine jate muki de
+                Reel — build a complete reel and publish it automatically
               </MenuItem>
             </TextField>
 
             {form.mode === "reel" && (
               <Alert severity="info" sx={{ py: 0.5 }}>
                 <Typography variant="caption">
-                  Dar run par Reel Studio ma upload kareli product images ma thi
-                  <strong> vaari fari </strong> ek lai ne aakhi reel banse —
-                  script, music, caption, hashtags badhu — ane Instagram +
-                  Facebook banne par jate mukai jashe. Tamare kai j karvanu nahi.
+                  Each run takes the next product photo from your Reel Studio
+                  library <strong>in turn</strong> and builds a complete reel —
+                  script, music, caption and hashtags — then publishes it to both
+                  Instagram and Facebook. Nothing for you to do.
                 </Typography>
               </Alert>
             )}
@@ -335,7 +335,7 @@ export default function AutomationsPage() {
               fullWidth
             />
             <TextField
-              label={form.mode === "reel" ? "Product vishe suchna (marji nu)" : "Topic / theme"}
+              label={form.mode === "reel" ? "Notes about the product (optional)" : "Topic or theme"}
               value={form.topic}
               onChange={(e) => setForm({ ...form, topic: e.target.value })}
               placeholder={
@@ -345,7 +345,7 @@ export default function AutomationsPage() {
               }
               helperText={
                 form.mode === "reel"
-                  ? "AI image joine j badhu kadhe che — aa fakt vadharani mahiti che"
+                  ? "The AI works everything out from the image; this is extra context only"
                   : "Aa AI ne dareak run par apashe"
               }
               multiline
@@ -358,7 +358,7 @@ export default function AutomationsPage() {
                 <Stack direction="row" spacing={2}>
                   <TextField
                     select
-                    label="Ek reel ma ketla product"
+                    label="Products per reel"
                     value={form.reelProductCount}
                     onChange={(e) =>
                       setForm({ ...form, reelProductCount: Number(e.target.value) })
@@ -367,7 +367,7 @@ export default function AutomationsPage() {
                   >
                     {[1, 2, 3, 4, 5, 6].map((n) => (
                       <MenuItem key={n} value={n}>
-                        {n === 1 ? "1 (ek product ni reel)" : `${n} (collection reel)`}
+                        {n === 1 ? "1 (single product)" : `${n} (collection reel)`}
                       </MenuItem>
                     ))}
                   </TextField>
@@ -441,10 +441,10 @@ export default function AutomationsPage() {
               label="Campaign (optional)"
               value={form.campaign}
               onChange={(e) => setForm({ ...form, campaign: e.target.value })}
-              helperText="Campaign no brand voice ane keywords AI ne malashe"
+              helperText="The campaign's brand voice and keywords are passed to the AI"
               fullWidth
             >
-              <MenuItem value="">— koi nahi —</MenuItem>
+              <MenuItem value="">— none —</MenuItem>
               {campaigns.map((campaign) => (
                 <MenuItem key={campaign._id} value={campaign._id}>
                   {campaign.name}
@@ -524,7 +524,7 @@ export default function AutomationsPage() {
                   }
                 />
               }
-              label="Auto-publish (band hoy to fakt draft banashe)"
+              label="Publish automatically (leave off to create drafts only)"
             />
           </Stack>
         </DialogContent>

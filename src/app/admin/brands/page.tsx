@@ -117,7 +117,7 @@ export default function BrandsPage() {
       `Aa brand ane ena BADHA accounts, posts, campaigns, automations ane DM rules delete thai jashe.\n\nConfirm karva brand nu naam lakho:`,
     );
     if (typed !== brand.name) {
-      if (typed !== null) setError("Naam match na thayu — kai delete na thayu");
+      if (typed !== null) setError("The name did not match — nothing was deleted.");
       return;
     }
     setBusy(brand._id);
@@ -126,7 +126,7 @@ export default function BrandsPage() {
         `/api/brands/${brand._id}?confirm=${encodeURIComponent(brand.name)}`,
         { method: "DELETE" },
       );
-      setNotice(`"${brand.name}" delete thayu`);
+      setNotice(`"${brand.name}" was deleted.`);
       load();
     } catch (e) {
       setError((e as Error).message);
@@ -139,7 +139,7 @@ export default function BrandsPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Brands"
-        subtitle="Dareak brand na potana accounts, posts ane DM rules — uper thi switch karo"
+        subtitle="Each brand keeps its own accounts, posts and DM rules. Switch between them from the top bar."
         action={
           <Button
             variant="contained"
@@ -224,7 +224,7 @@ export default function BrandsPage() {
                           ) : undefined
                         }
                       >
-                        Switch karo
+                        Switch to
                       </Button>
                     )}
                     <Box sx={{ flex: 1 }} />
@@ -248,7 +248,7 @@ export default function BrandsPage() {
       </Grid>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Navu brand banavo</DialogTitle>
+        <DialogTitle>Create a brand</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
@@ -326,7 +326,7 @@ export default function BrandsPage() {
             onClick={handleSave}
             disabled={saving || !form.name}
           >
-            {saving ? "Save thai rahyu…" : "Brand banavo"}
+            {saving ? "Saving…" : "Create brand"}
           </Button>
         </DialogActions>
       </Dialog>

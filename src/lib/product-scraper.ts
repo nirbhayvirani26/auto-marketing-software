@@ -113,10 +113,10 @@ export async function scrapeProduct(rawUrl: string): Promise<ScrapedProduct> {
   try {
     target = new URL(rawUrl.trim());
   } catch {
-    throw new Error("URL barabar nathi — https:// saathe poori link nakho");
+    throw new Error("That URL is not valid — paste the full link including https://");
   }
   if (!["http:", "https:"].includes(target.protocol)) {
-    throw new Error("Fakt http/https link chale che");
+    throw new Error("Only http and https links are supported");
   }
 
   let response: Response;

@@ -1,26 +1,29 @@
 /**
- * Image generation ane image EDITING.
+ * Image generation and image EDITING.
  *
- * Be alag kaam che, ane bije kaam j "mari avatar mara kapda pehri ne" ne
- * shakya banave che:
+ * These are two different jobs, and the second one is what makes "my avatar
+ * wearing my product" possible at all:
  *
- *   generateImage()  — sadho prompt → navi image (background, lifestyle shot)
- *   composeImage()   — reference image + prompt → navi image
- *                      (avatar no chehro + product na kapda ek j frame ma)
- *   virtualTryOn()   — khaas try-on model — kapdu vyaktine pehravi de che
+ *   generateImage()  — a prompt in, a new image out (background, lifestyle shot)
+ *   composeImage()   — reference images + a prompt, so the avatar's face and the
+ *                      product's real fabric end up in the same frame
+ *   virtualTryOn()   — a dedicated try-on model that dresses a person
  *
- * Providers:
- *   openai        — ChatGPT nu gpt-image-1. Sauthi saru — product ni vigat ane
- *                   chehro barabar sachve che, ane image par lakhelu text pan
- *                   saachu aave che. Paid. `IMAGE_PROVIDER=openai` thi pehla.
- *   gemini-image  — Gemini 2.5 Flash Image. FREE tier. Reference image
- *                   samje che ane chehro sachve che.
- *   pollinations  — koi key nahi. Fakt text→image (reference nahi samje).
- *   replicate     — optional, paid pan sasto. Khaas try-on model (IDM-VTON)
- *                   sauthi saacho result aape che.
+ * Providers, in the order they are tried:
  *
- * Kram runChain nakki kare che: default ma free pehla, pan `IMAGE_PROVIDER`
- * ma je lakhyu hoy e sauthi mokhare aave che. Ek fail thay to biju chale che.
+ *   nano-banana   — Nano Banana, Google's Gemini 2.5 Flash Image. This is the
+ *                   default. It is on the free tier, it reads reference images,
+ *                   and it holds a face steady across scenes, which is exactly
+ *                   what an avatar needs. One GEMINI_API_KEY covers it.
+ *   openai        — gpt-image-1. Excellent at preserving product detail and at
+ *                   rendering readable text inside the image, but it is paid.
+ *   pollinations  — no key at all. Text to image only; it cannot read a
+ *                   reference, so it is skipped whenever one is supplied.
+ *   replicate     — optional and cheap. Its dedicated try-on model (IDM-VTON)
+ *                   gives the most accurate clothing results.
+ *
+ * runChain decides the order: free first by default, and whatever is named in
+ * `IMAGE_PROVIDER` jumps to the front. If one fails the next one runs.
  */
 
 import sharp from "sharp";
@@ -37,7 +40,7 @@ export type GeneratedImage = {
 export type ReferenceImage = {
   data: Buffer;
   mimeType: string;
-  /** AI ne kahevu ke aa reference su che. */
+  /** Tells the model what this reference actually is. */
   role: "person" | "garment" | "product" | "style" | "background";
 };
 
@@ -52,17 +55,25 @@ const DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
 };
 
 /* ------------------------------------------------------------------ *
- *  Gemini 2.5 Flash Image
+ *  Nano Banana — Gemini 2.5 Flash Image
  * ------------------------------------------------------------------ */
 
 function geminiKey(): string {
   return process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
 }
 
+/**
+ * Nano Banana model ids, newest first.
+ *
+ * Google retires preview ids without much warning, so several are listed and
+ * tried in turn — a 404 on one must not take image generation down with it.
+ * `GEMINI_IMAGE_MODEL` always goes first when it is set.
+ */
 const GEMINI_IMAGE_MODELS = [
   process.env.GEMINI_IMAGE_MODEL,
+  "gemini-3.1-flash-image",
+  "nano-banana-pro-preview",
   "gemini-2.5-flash-image",
-  "gemini-2.0-flash-preview-image-generation",
 ].filter(Boolean) as string[];
 
 async function geminiImage(
@@ -80,7 +91,7 @@ async function geminiImage(
     try {
       const parts: unknown[] = [];
 
-      // Reference images pehla, ane dareak ne "aa su che" nu label.
+      // References go first, each one labelled so the model knows its role.
       for (const ref of opts.references) {
         const prepared = await shrink(ref.data, 1024);
         parts.push({ text: labelFor(ref.role) });
@@ -113,7 +124,7 @@ async function geminiImage(
       );
 
       if (json.promptFeedback?.blockReason) {
-        throw new FatalError(`Gemini e prompt block karyu: ${json.promptFeedback.blockReason}`);
+        throw new FatalError(`Nano Banana blocked the prompt: ${json.promptFeedback.blockReason}`);
       }
 
       const partsOut = json.candidates?.[0]?.content?.parts ?? [];
@@ -170,9 +181,9 @@ function openaiBaseUrl(): string {
 }
 
 /**
- * gpt-image-1 fakt traan maap aape che. Reel ubhu (9:16) joiye che, etle
+ * gpt-image-1 only offers three sizes. A reel is vertical (9:16), so the
  * ubha aakar mate 1024x1536 magie chie ane pachi fitToAspect() ene barabar
- * 1080x1920 ma kaapi aape che.
+ * result is cropped to 1080x1920 afterwards.
  */
 const OPENAI_SIZES: Record<AspectRatio, string> = {
   "1:1": "1024x1024",
@@ -196,14 +207,14 @@ type OpenAiImageResponse = {
 };
 
 /**
- * Be alag endpoint che ane e j aakho fer paade che:
+ * There are two endpoints, and choosing the right one changes everything:
  *
  *   reference vagar → /images/generations  (sadho prompt → navi image)
  *   reference sathe → /images/edits        (16 sudhi image reference tarike)
  *
- * `edits` j aapno mukhya rasto che — product ni asli photo ane avatar no
- * chehro reference tarike aapiye chie, etle AI product ne badli nathi sakto.
- * `input_fidelity: high` ena mate j che.
+ * `edits` is the path this app relies on: the real product photo and the
+ * avatar's face go in as references, so the model cannot reinvent the product.
+ * `input_fidelity: high` exists for exactly this.
  */
 async function openaiImage(
   opts: {
@@ -214,7 +225,7 @@ async function openaiImage(
   signal: AbortSignal,
 ): Promise<GeneratedImage> {
   const key = openaiKey();
-  if (!key) throw new FatalError("OPENAI_API_KEY set nathi");
+  if (!key) throw new FatalError("OPENAI_API_KEY is not set");
 
   const model = openaiModel();
   const size = OPENAI_SIZES[opts.aspectRatio];
@@ -223,8 +234,8 @@ async function openaiImage(
   let json: OpenAiImageResponse;
 
   if (opts.references.length > 0) {
-    // Dareak reference ne "aa su che" nu label prompt ma aapiye chie —
-    // gpt-image-1 image no kram ane lakhan banne dhyan ma le che.
+    // Label each reference inside the prompt as well — gpt-image-1 pays
+    // attention to both the order of the images and the wording.
     const labelled = [
       ...opts.references.map((ref, index) => `Image ${index + 1}: ${labelFor(ref.role)}`),
       "",
@@ -240,7 +251,7 @@ async function openaiImage(
     form.append("input_fidelity", "high");
     form.append("output_format", "jpeg");
 
-    // 16 thi vadhu reference gpt-image-1 letu nathi.
+    // gpt-image-1 accepts at most 16 reference images.
     for (const [index, ref] of opts.references.slice(0, 16).entries()) {
       const prepared = await shrink(ref.data, 1536);
       form.append(
@@ -268,8 +279,8 @@ async function openaiImage(
         size,
         quality: openaiQuality(),
         output_format: "jpeg",
-        // Product photo ma kyarek kapda/body ne moderation adkave che —
-        // `low` thi asli marketing image block thata atke che.
+        // Moderation sometimes trips on clothing and bodies in ordinary
+        // product photos; `low` stops real marketing images being blocked.
         moderation: "low",
       }),
     });
@@ -279,7 +290,7 @@ async function openaiImage(
 
   const first = json.data?.[0];
 
-  // gpt-image-1 hamesha base64 aape che; junaa/proxy setup ma URL aavi shake.
+  // gpt-image-1 always returns base64; older or proxied setups may send a URL.
   if (first?.b64_json) {
     return {
       data: Buffer.from(first.b64_json, "base64"),
@@ -328,7 +339,7 @@ async function pollinationsImage(
     headers: token ? { authorization: `Bearer ${token}` } : undefined,
   });
 
-  // Kyarek HTML error page aave che — image che ke nahi e khatri karo.
+  // Sometimes an HTML error page comes back — make sure this really is an image.
   if (data.length < 5000) throw new Error("Pollinations e kharab jawab aapyo");
   try {
     await sharp(data).metadata();
@@ -410,7 +421,7 @@ async function shrink(data: Buffer, maxSide: number): Promise<Buffer> {
   }
 }
 
-/** Reel mate hamesha barabar 1080x1920 joiye — provider je aape e fit karo. */
+/** A reel needs exactly 1080x1920, whatever size the provider returned. */
 export async function fitToAspect(
   data: Buffer,
   aspect: AspectRatio,
@@ -428,7 +439,7 @@ export async function fitToAspect(
 
 export type GenerateImageOptions = {
   prompt: string;
-  /** Reference aapo to Gemini j chale che (bija reference samajta nathi). */
+  /** With references only Nano Banana and gpt-image-1 run; the rest cannot read them. */
   references?: ReferenceImage[];
   aspectRatio?: AspectRatio;
   seed?: number;
@@ -455,8 +466,8 @@ export async function generateImage(
         timeoutMs: 240_000,
       },
       {
-        name: "gemini-image",
-        label: "Gemini 2.5 Flash Image (free)",
+        name: "nano-banana",
+        label: "Nano Banana — Gemini 2.5 Flash Image (free)",
         free: true,
         configured: () => Boolean(geminiKey()),
         run: (signal) => geminiImage({ prompt: options.prompt, references, aspectRatio }, signal),
@@ -464,10 +475,10 @@ export async function generateImage(
       },
       {
         name: "pollinations",
-        label: "Pollinations (key vagar)",
+        label: "Pollinations (no key needed)",
         free: true,
-        // Reference joito hoy to pollinations kaam nu nathi — e fakt text
-        // samje che. Khoti image aapva karta skip karvu saaru.
+        // Pollinations only understands text, so with references it would
+        // return the wrong picture entirely. Better to skip it.
         configured: () =>
           !needsReferences && process.env.MEDIA_ALLOW_ANON_HOSTS !== "false",
         run: (signal) =>
@@ -514,7 +525,7 @@ export async function generateImage(
 }
 
 /**
- * Reference image sathe navi image — "aa vyakti ne aa kapdu pehravo",
+ * A new image built from references: "put this garment on this person",
  * "aa product ne aa jagya e mukho".
  */
 export function composeImage(options: {
@@ -532,10 +543,11 @@ export function composeImage(options: {
 }
 
 /**
- * Virtual try-on — kapdu vyakti par pehravi de che.
+ * Virtual try-on — puts a garment onto a person.
  *
- * REPLICATE_API_TOKEN hoy to khaas try-on model vaparay che (sauthi saacho
- * result). Nahi to Gemini thi j kaam chalavie chie — e pan saaru kare che.
+ * With REPLICATE_API_TOKEN set, a dedicated try-on model runs and gives the
+ * most accurate result. Without it, Nano Banana handles the job, which is
+ * good enough for most catalogue work.
  */
 export async function virtualTryOn(options: {
   person: Buffer;
@@ -562,7 +574,7 @@ export async function virtualTryOn(options: {
     [
       {
         name: "replicate-tryon",
-        label: "IDM-VTON (khaas try-on model)",
+        label: "IDM-VTON (dedicated try-on model)",
         free: false,
         configured: () => Boolean(process.env.REPLICATE_API_TOKEN),
         run: async (signal) => ({
@@ -603,8 +615,8 @@ export async function virtualTryOn(options: {
         timeoutMs: 240_000,
       },
       {
-        name: "gemini-image",
-        label: "Gemini 2.5 Flash Image (free)",
+        name: "nano-banana",
+        label: "Nano Banana — Gemini 2.5 Flash Image (free)",
         free: true,
         configured: () => Boolean(geminiKey()),
         run: (signal) =>
@@ -624,8 +636,8 @@ export async function virtualTryOn(options: {
     ],
     {
       label: "Virtual try-on",
-      // Try-on ma khaas model ni gunvatta ghani sari che, etle ahiya free
-      // ne pehli pasandgi nathi aapta.
+      // The dedicated try-on model is markedly better here, so this is the
+      // one place where free providers do not go first.
       preferFree: false,
       prefer: process.env.TRYON_PROVIDER,
       retries: 1,
@@ -634,7 +646,7 @@ export async function virtualTryOn(options: {
   );
 }
 
-/** Setup page mate. */
+/** Provider status for the Setup page. */
 export function imageGenStatus() {
   return [
     {
@@ -642,28 +654,28 @@ export function imageGenStatus() {
       label: `OpenAI ${openaiModel()}`,
       free: false,
       configured: Boolean(openaiKey()),
-      note: "ChatGPT ni image API. Product ni vigat ane chehro sauthi barabar sachve che. platform.openai.com/api-keys",
+      note: "Paid. The most faithful product detail and the only one that reliably renders text inside an image. platform.openai.com/api-keys",
     },
     {
-      key: "gemini-image",
-      label: "Gemini 2.5 Flash Image",
+      key: "nano-banana",
+      label: "Nano Banana (Gemini 2.5 Flash Image)",
       free: true,
       configured: Boolean(geminiKey()),
-      note: "Avatar + kapda mate aa j joiye — reference image samje che. aistudio.google.com/apikey",
+      note: "The default. Free, reads reference images, and keeps a face consistent across scenes — which is what avatars need. aistudio.google.com/apikey",
     },
     {
       key: "pollinations",
       label: "Pollinations",
       free: true,
       configured: process.env.MEDIA_ALLOW_ANON_HOSTS !== "false",
-      note: "Koi key nahi. Fakt background/lifestyle image — avatar mate kaam nu nathi.",
+      note: "No key required. Backgrounds and lifestyle shots only — it cannot work from a reference photo.",
     },
     {
       key: "replicate",
       label: "Replicate (IDM-VTON)",
       free: false,
       configured: Boolean(process.env.REPLICATE_API_TOKEN),
-      note: "Sauthi saacho virtual try-on. Ek image na ~₹2. replicate.com/account/api-tokens",
+      note: "The most accurate virtual try-on, at a few cents per image. replicate.com/account/api-tokens",
     },
   ];
 }

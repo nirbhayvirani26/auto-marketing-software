@@ -1,18 +1,18 @@
 /**
- * Video publishing — Instagram Reels ane Facebook Reels.
+ * Video publishing — Instagram Reels and Facebook Reels.
  *
- * Aa image post karta ghanu alag che, etle alag file ma rakhyu che.
+ * Different enough from posting an image to deserve its own file.
  *
- * ⚠️ BE VAAT JE KHABAR HOVI JOIYE:
+ * TWO THINGS WORTH KNOWING:
  *
- * 1. Meta na server TAMARA URL par thi video DOWNLOAD kare che. Etle
- *    `localhost` kyarey nahi chale — public https URL joiye j. Aapno media
- *    store aa aapoaap sambhale che (Cloudinary/Catbox/tunnel).
+ * 1. Meta's servers DOWNLOAD the video from your URL. `localhost` will
+ *    therefore never work — a public https URL is mandatory. The media store
+ *    handles this automatically (Cloudinary, Catbox or a tunnel).
  *
- * 2. Instagram nu trending SONG aa API thi lagavi shakatu nathi. Meta e
- *    music catalog API ma kholyu j nathi. Video ni andar bake karelu music
- *    j jaay che. Trending sound joito hoy to publish pachi IG app ma
- *    2 tap ma badli shakay — app ma e suchav aapiye chie.
+ * 2. Instagram's trending SONG cannot be attached through this API. Meta has
+ *    never opened the music catalogue, so only the music baked into the video
+ *    goes out. A trending sound can be swapped in afterwards inside the app in
+ *    two taps — the suggestion for which one is shown in the UI.
  */
 
 import { env } from "./env";
@@ -99,7 +99,7 @@ export async function waitForInstagramContainer(opts: {
       );
     }
     if (status.status_code === "EXPIRED") {
-      throw new Error("Instagram container ni muddat puri thai gai — fari try karo.");
+      throw new Error("The Instagram upload container expired — please try again.");
     }
 
     if (Date.now() > deadline) {
@@ -228,7 +228,7 @@ export async function publishCarouselToInstagram(opts: {
   onProgress?: (step: string) => void;
 }): Promise<VideoPublishResult> {
   if (opts.items.length < 2 || opts.items.length > 10) {
-    throw new Error("Carousel ma 2 thi 10 vachhe item hova joiye");
+    throw new Error("A carousel must have between 2 and 10 items");
   }
 
   const childIds: string[] = [];
@@ -325,7 +325,7 @@ export async function publishReelToFacebook(opts: {
   onProgress?: (step: string) => void;
 }): Promise<VideoPublishResult> {
   if (!/^https:\/\//i.test(opts.videoUrl)) {
-    throw new Error("Facebook ne pan PUBLIC https URL joiye — localhost nahi chale.");
+    throw new Error("Facebook also needs a public https URL — localhost will not work.");
   }
 
   opts.onProgress?.("Facebook par upload session banavie chie");

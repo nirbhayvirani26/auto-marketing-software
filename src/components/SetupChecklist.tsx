@@ -19,8 +19,8 @@ type Check = { ok: boolean; label: string; hint?: string; optional?: boolean };
 type Health = Record<string, Check>;
 
 /**
- * Dashboard par dekhaadu banner — su configure baaki che e batave.
- * Badhu set hoy to kai nathi dekhaadtu.
+ * The banner on the dashboard listing what is still unconfigured.
+ * Once everything is set it disappears on its own.
  */
 export default function SetupChecklist() {
   const [health, setHealth] = React.useState<Health | null>(null);
@@ -41,11 +41,11 @@ export default function SetupChecklist() {
       severity="warning"
       action={
         <Button size="small" onClick={() => setExpanded((value) => !value)}>
-          {expanded ? "Chupavo" : "Badhu jovo"}
+          {expanded ? "Hide" : "Show all"}
         </Button>
       }
     >
-      <AlertTitle>Setup adhuru che — {missing.length} vastu baaki</AlertTitle>
+      <AlertTitle>Setup is incomplete — {missing.length} left to do</AlertTitle>
       {missing.map((check) => check.label).join(" · ")}
 
       <Collapse in={expanded}>

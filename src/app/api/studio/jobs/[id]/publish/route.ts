@@ -29,7 +29,7 @@ export const POST = handle(async (request, ctx) => {
   const body = schema.parse(await request.json().catch(() => ({})));
 
   if (body.when === "schedule" && !body.scheduledAt) {
-    return fail("Schedule mate vakhat aapo (scheduledAt)", 422);
+    return fail("Provide a time to schedule for (scheduledAt)", 422);
   }
 
   const result = await distributeReel({
@@ -56,7 +56,7 @@ export const GET = handle(async (_request, ctx) => {
   const job = await ReelJob.findOne({ _id: id, brand: auth.brandId })
     .select("analysis status")
     .lean();
-  if (!job) return fail("Reel job madyo nahi", 404);
+  if (!job) return fail("Reel job not found", 404);
 
   const analysis = job.analysis as { category?: string } | undefined;
 

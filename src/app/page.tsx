@@ -8,12 +8,12 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "AI thi social media marketing — Auto Marketing",
   description:
-    "Ek jagya thi Facebook ane Instagram par AI posts banavo, schedule karo, auto publish karo, ane comment par auto DM moklo.",
+    "Write AI posts for Facebook and Instagram, schedule them, publish automatically, and reply to comments with a direct message — all from one place.",
 };
 
 /**
- * Public marketing home page. Plans DB mathi aave che — super admin plans
- * badle to ahiya turant dekhaay che.
+ * The public marketing home page. Plans come from the database, so anything
+ * the super admin changes shows up here immediately.
  */
 export default async function HomePage() {
   let plans: PublicPlan[] = [];
@@ -27,7 +27,7 @@ export default async function HomePage() {
       ),
     );
   } catch {
-    // DB band hoy to pan landing page dekhavu joiye.
+    // The landing page must still render even if the database is unreadable.
   }
 
   return <LandingPage plans={plans} />;

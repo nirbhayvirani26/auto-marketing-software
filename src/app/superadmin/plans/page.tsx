@@ -151,7 +151,7 @@ export default function SuperAdminPlans() {
     <Stack spacing={3}>
       <PageHeader
         title="Plans & Pricing"
-        subtitle="Plans banavo, price nakki karo, ane kaya modules ma aave e set karo"
+        subtitle="Create plans, set their prices, and choose which modules each one unlocks."
         action={
           <Button
             variant="contained"
@@ -363,7 +363,7 @@ export default function SuperAdminPlans() {
             onClick={save}
             disabled={saving || !draft.key || !draft.name}
           >
-            {saving ? "Save thai rahyu…" : "Save karo"}
+            {saving ? "Saving…" : "Save"}
           </Button>
         </DialogActions>
       </Dialog>

@@ -152,7 +152,7 @@ export const POST = handle(async (req) => {
       required: true,
       ok: false,
       ms: 0,
-      error: "Ek pan AI provider ni key set nathi",
+      error: "No AI provider key is set",
       fix: "aistudio.google.com/apikey par thi FREE key lo ane .env ma GEMINI_API_KEY ma nakho.",
     });
   } else if (!results.some((r) => r.key.startsWith("text:") && r.ok)) {
@@ -162,7 +162,7 @@ export const POST = handle(async (req) => {
       required: true,
       ok: false,
       ms: 0,
-      error: "Badhi key set che pan ek pan kaam na kari",
+      error: "Every key is set, but none of them worked",
       fix: "Uper na error vancho. Sauthi saral upay: aistudio.google.com/apikey par thi FREE Gemini key lo.",
     });
   }
@@ -275,7 +275,7 @@ export const POST = handle(async (req) => {
       "JAMENDO_CLIENT_ID (free) naakho, ke storage/music/ ma potani mp3 mukho.",
       async () => {
         const picked = await pickMusic({ mood: "upbeat", minDuration: 30 });
-        if (!picked) throw new Error("Ek pan track na madyo");
+        if (!picked) throw new Error("No track was found");
         return `${picked.track.source} — "${picked.track.title}" (${Math.round(picked.track.duration)}s)`;
       },
     ),
@@ -308,7 +308,7 @@ export const POST = handle(async (req) => {
       async () => {
         const appId = process.env.META_APP_ID || "";
         const secret = process.env.META_APP_SECRET || "";
-        if (!appId || !secret) throw new Error("META_APP_ID / META_APP_SECRET set nathi");
+        if (!appId || !secret) throw new Error("META_APP_ID and META_APP_SECRET are not set");
 
         const version = process.env.META_GRAPH_VERSION || "v21.0";
 
@@ -326,7 +326,7 @@ export const POST = handle(async (req) => {
 
         if (json.error) throw new Error(json.error.message ?? "Meta e na paadi");
         if (!json.access_token) {
-          throw new Error("META_APP_ID ke META_APP_SECRET khoto che");
+          throw new Error("META_APP_ID or META_APP_SECRET is wrong");
         }
         return `App ${appId} barabar che`;
       },

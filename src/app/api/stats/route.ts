@@ -20,7 +20,7 @@ export const GET = handle(async () => {
     automations,
     dmRules,
     dmSent,
-    statusCounts,
+    byStatus,
     upcoming,
     recentLogs,
   ] = await Promise.all([
@@ -29,10 +29,7 @@ export const GET = handle(async () => {
     Automation.countDocuments({ ...scope, enabled: true }),
     CommentRule.countDocuments({ ...scope, enabled: true }),
     CommentEvent.countDocuments({ ...scope, dmSent: true }),
-    Post.aggregate<{ _id: string; count: number }>([
-      { $match: { brand: ctx.brand._id } },
-      { $group: { _id: "$status", count: { $sum: 1 } } },
-    ]),
+    Post.groupCount("status", { brand: ctx.brand._id }),
     Post.find({ ...scope, status: "scheduled", scheduledAt: { $gte: new Date() } })
       .populate("account", "displayName platform")
       .sort({ scheduledAt: 1 })
@@ -40,10 +37,6 @@ export const GET = handle(async () => {
       .lean(),
     ActivityLog.find().sort({ createdAt: -1 }).limit(8).lean(),
   ]);
-
-  const byStatus = Object.fromEntries(
-    statusCounts.map((entry) => [entry._id, entry.count]),
-  ) as Record<string, number>;
 
   return ok({
     brand: { id: String(ctx.brand._id), name: ctx.brand.name },

@@ -1,15 +1,53 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { model, ObjectId, Schema, type BaseFields } from "@/lib/localdb";
 
 /**
- * "Koi post par comment kare to su karvu" — aa rule nakki kare che.
+ * "When someone comments on a post, do this."
  *
- * Meta ni be alag capability vaparay che:
- *  - public reply  : comment ni niche jaher ma jawab
- *  - private reply : e user ne DM (Instagram/Messenger inbox ma)
+ * Two separate Meta capabilities are involved:
+ *   public reply  — a visible answer under the comment
+ *   private reply — a direct message to that person's inbox
  *
- * ⚠️ Meta ni limit: private reply ek comment dith **ek j vaar** mokli shakay,
- * ane comment thai gaya na 7 divas ni andar j. Aa platform no niyam che.
+ * Meta's limits apply: a private reply may be sent **once** per comment, and
+ * only within seven days of the comment. That is a platform rule, not ours.
  */
+export type CommentRuleDoc = BaseFields & {
+  brand: ObjectId;
+  name: string;
+  /** Which accounts this rule covers. Empty means every account in the brand. */
+  accounts: ObjectId[];
+  /** Any of these words triggers the rule. Empty means every comment does. */
+  keywords: string[];
+  matchType: "any" | "all" | "exact";
+  caseSensitive: boolean;
+
+  publicReply: boolean;
+  publicReplyText?: string;
+
+  sendDm: boolean;
+  dmText?: string;
+  dmLinkUrl?: string;
+  dmLinkTitle?: string;
+
+  /**
+   * When a product is attached, its link is sent instead of `dmLinkUrl` —
+   * that is the "comment to get the link in your DMs" flow.
+   */
+  product?: ObjectId;
+
+  /** Write the reply with AI from the comment's context instead of fixed text. */
+  useAi: boolean;
+  aiInstruction?: string;
+
+  enabled: boolean;
+  /** Stops the same person being messaged over and over. */
+  onlyOncePerUser: boolean;
+
+  triggerCount: number;
+  lastTriggeredAt?: Date;
+  lastError?: string;
+  createdBy?: ObjectId;
+};
+
 const CommentRuleSchema = new Schema(
   {
     brand: {
@@ -20,13 +58,8 @@ const CommentRuleSchema = new Schema(
     },
     name: { type: String, required: true, trim: true },
 
-    // Kaya accounts par aa rule lagu pade. Khali = brand na badha accounts.
     accounts: [{ type: Schema.Types.ObjectId, ref: "SocialAccount" }],
 
-    /**
-     * Comment ma aa mathi koi pan shabd hoy to rule trigger thay.
-     * Khali rakho to *dareak* comment par trigger thashe.
-     */
     keywords: { type: [String], default: [] },
     matchType: {
       type: String,
@@ -35,31 +68,20 @@ const CommentRuleSchema = new Schema(
     },
     caseSensitive: { type: Boolean, default: false },
 
-    // --- Su karvu ---
     publicReply: { type: Boolean, default: true },
     publicReplyText: { type: String, trim: true },
 
     sendDm: { type: Boolean, default: true },
     dmText: { type: String, trim: true },
-    // DM ma link mokalvo hoy to (dakhla tarike offer page)
     dmLinkUrl: { type: String, trim: true },
     dmLinkTitle: { type: String, trim: true },
 
-    /**
-     * Product jodyu hoy to DM ma ENI link jaay che — `dmLinkUrl` ne badle.
-     * Aa thi "comment karo to product ni link DM ma malshe" flow bane che.
-     */
     product: { type: Schema.Types.ObjectId, ref: "Product" },
 
-    /**
-     * true hoy to reply AI thi banashe (comment no context aapine),
-     * fixed text ne badle.
-     */
     useAi: { type: Boolean, default: false },
     aiInstruction: { type: String, trim: true },
 
     enabled: { type: Boolean, default: true, index: true },
-    // Ek j user ne vaar vaar DM na jay etle
     onlyOncePerUser: { type: Boolean, default: true },
 
     triggerCount: { type: Number, default: 0 },
@@ -70,20 +92,30 @@ const CommentRuleSchema = new Schema(
   { timestamps: true },
 );
 
-export type CommentRuleDoc = InferSchemaType<typeof CommentRuleSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
-
-export const CommentRule: Model<CommentRuleDoc> =
-  (mongoose.models.CommentRule as Model<CommentRuleDoc>) ||
-  mongoose.model<CommentRuleDoc>("CommentRule", CommentRuleSchema);
+export const CommentRule = model<CommentRuleDoc>("CommentRule", CommentRuleSchema);
 
 /* ------------------------------------------------------------------ */
 
 /**
- * Dareak handle thayela comment no record — duplicate DM rokva ane
- * audit trail mate.
+ * A record of every comment that was handled — it prevents duplicate direct
+ * messages and doubles as an audit trail.
  */
+export type CommentEventDoc = BaseFields & {
+  brand?: ObjectId;
+  rule?: ObjectId;
+  account?: ObjectId;
+  platform?: "facebook" | "instagram";
+  /** Identifiers as they come from Meta. */
+  commentId: string;
+  postId?: string;
+  fromUserId?: string;
+  fromUsername?: string;
+  commentText?: string;
+  publicReplied: boolean;
+  dmSent: boolean;
+  error?: string;
+};
+
 const CommentEventSchema = new Schema(
   {
     brand: { type: Schema.Types.ObjectId, ref: "Brand", index: true },
@@ -91,7 +123,6 @@ const CommentEventSchema = new Schema(
     account: { type: Schema.Types.ObjectId, ref: "SocialAccount" },
     platform: { type: String, enum: ["facebook", "instagram"] },
 
-    // Meta na IDs
     commentId: { type: String, required: true, index: true },
     postId: { type: String },
     fromUserId: { type: String, index: true },
@@ -105,13 +136,7 @@ const CommentEventSchema = new Schema(
   { timestamps: true },
 );
 
-// Ek comment be vaar process na thay.
+// A single comment is never processed twice.
 CommentEventSchema.index({ commentId: 1 }, { unique: true });
 
-export type CommentEventDoc = InferSchemaType<typeof CommentEventSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
-
-export const CommentEvent: Model<CommentEventDoc> =
-  (mongoose.models.CommentEvent as Model<CommentEventDoc>) ||
-  mongoose.model<CommentEventDoc>("CommentEvent", CommentEventSchema);
+export const CommentEvent = model<CommentEventDoc>("CommentEvent", CommentEventSchema);

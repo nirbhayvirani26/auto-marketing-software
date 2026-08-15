@@ -1,10 +1,16 @@
 /**
- * Caption / description lakhvanu.
+ * Captions and descriptions.
  *
- * Fakt "sarsu lakho" nahi — lakhi ne TAPASO ane jarur pade to FARI lakho.
- * scoreCaption() ranking na najariya thi marks aape che; ochha aave to
- * ene su khute che e batavi ne AI pase fari lakhavie chie. Etle bahar
- * hamesha ek j level nu caption jaay che, AI no mood gme te hoy.
+ * Not simply "write something good" — write it, GRADE it, and rewrite when the
+ * grade is poor. scoreCaption() marks the draft the way the ranking algorithms
+ * see it; a low score is fed back to the model with exactly what is missing.
+ * The result is a consistent standard leaving the app, whatever mood the model
+ * happens to be in.
+ *
+ * If every AI provider is unavailable — no key, no credit, an outage — a
+ * template caption is assembled from the product facts instead. It is plainer
+ * than a written one, but the reel still ships with a usable, honest caption
+ * rather than failing outright.
  */
 
 import { complete } from "@/lib/ai/index";
@@ -16,19 +22,21 @@ export type CopyFormat = "reel" | "image" | "carousel" | "story";
 export type CopyPlatform = "instagram" | "facebook";
 
 export type SocialCopy = {
-  /** Pehli line — 'more' pehla aa j dekhay che. */
+  /** The first line — all that shows before 'more'. */
   hook: string;
   caption: string;
   hashtags: string[];
-  /** Post par mukvano CTA. */
+  /** The call to action placed on the post. */
   callToAction: string;
-  /** Reel/video mate — YouTube/FB description jevu lambu, keyword bharelu. */
+  /** A longer, keyword-rich description for reels and Facebook. */
   description: string;
-  /** Pehla comment ma mukvano hashtag block (IG ni saras practice). */
+  /** The hashtag block for the first comment — standard practice on Instagram. */
   firstComment: string;
   score: CaptionScore;
-  /** Ketli var fari lakhyu. */
+  /** How many times it was rewritten. */
   revisions: number;
+  /** True when no AI provider was reachable and the template was used. */
+  fromTemplate: boolean;
 };
 
 const COPY_SCHEMA = {
@@ -92,7 +100,7 @@ export type GenerateCopyOptions = {
   language?: string;
   productUrl?: string;
   price?: string;
-  /** Ochho score aave to ketli var fari lakhavu. */
+  /** How many rewrites to allow when the score comes back low. */
   maxRevisions?: number;
 };
 
@@ -110,52 +118,144 @@ export async function generateSocialCopy(
   let best: { copy: CopyResponse; score: CaptionScore } | null = null;
   let revisions = 0;
   let feedback: string[] = [];
+  let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt <= maxRevisions; attempt += 1) {
-    const { data } = await complete<CopyResponse>({
-      system: systemPrompt(language),
-      prompt: userPrompt(options, keywords, feedback),
-      schema: COPY_SCHEMA,
-      maxTokens: 2500,
-    });
-
-    const caption = assembleCaption(data, options.platform);
-    const score = scoreCaption({
-      caption,
+  const grade = (copy: CopyResponse): CaptionScore =>
+    scoreCaption({
+      caption: assembleCaption(copy, options.platform),
       hashtags,
       keywords,
       platform: options.platform,
       format: options.format,
     });
 
-    if (!best || score.score > best.score.score) {
-      best = { copy: data, score };
+  for (let attempt = 0; attempt <= maxRevisions; attempt += 1) {
+    let data: CopyResponse;
+    try {
+      ({ data } = await complete<CopyResponse>({
+        system: systemPrompt(language),
+        prompt: userPrompt(options, keywords, feedback),
+        schema: COPY_SCHEMA,
+        maxTokens: 2500,
+      }));
+    } catch (error) {
+      // Every provider is down or out of quota. Stop asking and use whatever
+      // the earlier attempts produced, or fall back to the template.
+      lastError = error as Error;
+      break;
     }
 
+    const score = grade(data);
+    if (!best || score.score > best.score.score) best = { copy: data, score };
     if (score.score >= 85) break;
 
     revisions = attempt + 1;
     feedback = score.checks
-      .filter((c) => !c.passed)
-      .map((c) => `${c.label} — ${c.hint}`);
+      .filter((check) => !check.passed)
+      .map((check) => `${check.label} — ${check.hint}`);
   }
 
-  if (!best) throw new Error("Caption banavi na shakayu");
-
-  const caption = assembleCaption(best.copy, options.platform);
+  const fromTemplate = best === null;
+  if (!best) {
+    const copy = templateCopy(options, keywords);
+    best = { copy, score: grade(copy) };
+    console.warn(
+      `[copy] Falling back to a template caption — ${lastError?.message ?? "no AI provider was available"}`,
+    );
+  }
 
   return {
     hook: best.copy.hook.trim(),
-    caption,
+    caption: assembleCaption(best.copy, options.platform),
     hashtags,
     callToAction: best.copy.callToAction.trim(),
     description: best.copy.description.trim(),
     firstComment:
-      options.platform === "instagram"
-        ? hashtags.map((t) => `#${t}`).join(" ")
-        : "",
+      options.platform === "instagram" ? hashtags.map((tag) => `#${tag}`).join(" ") : "",
     score: best.score,
     revisions,
+    fromTemplate,
+  };
+}
+
+/**
+ * A caption built only from facts already known about the product — no model
+ * involved, so nothing here can be invented. Used when every AI provider is
+ * unavailable.
+ */
+function templateCopy(options: GenerateCopyOptions, keywords: string[]): CopyResponse {
+  const product = options.product;
+  const audience =
+    product.targetAudience || `${product.targetGender}, ${product.targetAgeRange}`;
+  const brand = options.brandName?.trim();
+
+  // Vision never saw the photo, so nothing specific about the product is known.
+  // Lead with the brand, which IS true, rather than inventing a product name.
+  if (product.degraded) {
+    return {
+      hook: brand ? `New in at ${brand}` : "New in",
+      body: [options.price ? `${options.price}.` : "", "Swipe up for the details."]
+        .filter(Boolean)
+        .join("\n"),
+      callToAction:
+        options.platform === "instagram"
+          ? "Comment below and we will send you the details."
+          : "Tell us in the comments what you would like to know.",
+      description: [
+        brand ? `A new piece from ${brand}.` : "A new piece in stock.",
+        options.price ? `Price: ${options.price}.` : "",
+        "Message us for sizes, colours and availability.",
+      ]
+        .filter(Boolean)
+        .join(" "),
+    };
+  }
+
+  // A keyword only earns a place in the hook if it is specific AND actually
+  // about this product. "General" is the placeholder normalise() falls back
+  // to, and a stray trending phrase reads like a mistake in the caption.
+  const generic = new Set(["general", "product", "unknown", "", "other"]);
+  const productWords = new Set(
+    `${product.productName} ${product.subCategory} ${product.category}`
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((word) => word.length >= 3),
+  );
+
+  const keyword = [keywords[0], product.subCategory, product.category].find((candidate) => {
+    const value = candidate?.toLowerCase().trim();
+    if (!value || generic.has(value)) return false;
+    return value.split(/[^a-z0-9]+/).some((word) => productWords.has(word));
+  });
+
+  const details = [
+    product.materials.length ? `Made from ${product.materials.join(", ")}.` : "",
+    product.colors.length ? `Available in ${product.colors.join(", ")}.` : "",
+    product.occasions.length ? `Made for ${product.occasions.join(", ")}.` : "",
+    product.sellingPoints[0] ? `${product.sellingPoints[0]}.` : "",
+    options.price ? `${options.price}.` : "",
+  ].filter(Boolean);
+
+  return {
+    hook: keyword
+      ? `${product.productName} — the ${keyword} worth a second look`
+      : product.productName,
+    body: details.slice(0, 4).join("\n"),
+    callToAction:
+      options.platform === "instagram"
+        ? "Comment SIZE and we will send you the fit guide."
+        : "Tell us in the comments which colour you would pick.",
+    description: [
+      `${product.productName} from ${options.brandName ?? "our store"}.`,
+      product.materials.length ? `Material: ${product.materials.join(", ")}.` : "",
+      product.colors.length ? `Colours: ${product.colors.join(", ")}.` : "",
+      product.style ? `Style: ${product.style}.` : "",
+      product.occasions.length ? `Best for: ${product.occasions.join(", ")}.` : "",
+      audience ? `Made for ${audience}.` : "",
+      options.price ? `Price: ${options.price}.` : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
   };
 }
 

@@ -34,7 +34,7 @@ export const PATCH = handle(async (request, { params }) => {
     body,
     { new: true },
   );
-  if (!rule) return fail("Rule madyu nahi", 404);
+  if (!rule) return fail("Rule not found", 404);
 
   return ok({ id: String(rule._id) });
 });
@@ -48,7 +48,7 @@ export const DELETE = handle(async (_request, { params }) => {
     _id: id,
     brand: ctx.brandId,
   });
-  if (!rule) return fail("Rule madyu nahi", 404);
+  if (!rule) return fail("Rule not found", 404);
 
   return ok({ deleted: true });
 });
@@ -67,7 +67,7 @@ export const POST = handle(async (request, { params }) => {
     .parse(await request.json());
 
   const rule = await CommentRule.findOne({ _id: id, brand: ctx.brandId });
-  if (!rule) return fail("Rule madyu nahi", 404);
+  if (!rule) return fail("Rule not found", 404);
 
   const matched = ruleMatches(rule, comment);
 

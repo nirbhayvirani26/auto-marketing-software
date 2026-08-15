@@ -147,7 +147,7 @@ export default function SetupPage() {
         subtitle="Instagram ane Facebook automation chalu karva mate na steps"
         action={
           <Button variant="outlined" startIcon={<RefreshIcon />} onClick={load}>
-            Fari check karo
+            Check again
           </Button>
         }
       />
@@ -155,8 +155,8 @@ export default function SetupPage() {
       <Alert severity={done === 4 ? "success" : "info"}>
         <AlertTitle>{done}/4 step puri thai</AlertTitle>
         {done === 4
-          ? "Badhu taiyar che — Reel Studio ma product ni image mukho ane reel banavo!"
-          : "Niche na steps puri karo. Dareak step pachi 'Fari check karo' dabavo."}
+          ? "Everything is ready — open the Reel Studio, add a product photo and build a reel."
+          : "Work through the steps below. Press 'Check again' after each one."}
       </Alert>
 
       <StudioReadiness />
@@ -168,13 +168,13 @@ export default function SetupPage() {
             <Step expanded>
               <StepLabel icon={<Status ok={health.ai.ok} />}>
                 <Typography variant="subtitle1" fontWeight={700}>
-                  AI chalu karo — FREE
+                  Turn on AI — free
                 </Typography>
               </StepLabel>
               <StepContent>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Post na caption AI lakhe che. Sauthi saralo free vikalp Google
-                  Gemini che — credit card ni jarur nathi.
+                  The AI writes your captions. The simplest free option is Google
+                  Gemini, and it needs no credit card.
                 </Typography>
 
                 <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
@@ -190,7 +190,7 @@ export default function SetupPage() {
                 </Stack>
 
                 <Typography variant="subtitle2" gutterBottom>
-                  Vikalp A — Google Gemini (free, 2 minute)
+                  Option A — Google Gemini (free, two minutes)
                 </Typography>
                 <Stack spacing={1} sx={{ mb: 2 }}>
                   <Typography variant="body2">
@@ -202,20 +202,20 @@ export default function SetupPage() {
                     >
                       aistudio.google.com/apikey <OpenInNewIcon sx={{ fontSize: 13 }} />
                     </MuiLink>{" "}
-                    kholo → Google account thi sign in
+                    and sign in with your Google account
                   </Typography>
                   <Typography variant="body2">
-                    2. <strong>Create API key</strong> dabavo, key copy karo
+                    2. Press <strong>Create API key</strong> and copy it
                   </Typography>
                   <Typography variant="body2">
-                    3. Project na <code>.env</code> file ma aa nakho:
+                    3. Put it in the project's <code>.env</code> file:
                   </Typography>
                 </Stack>
-                <Code>{`GEMINI_API_KEY=AIza...tamari-key...
+                <Code>{`GEMINI_API_KEY=AIza...your-key...
 AI_PROVIDER=gemini`}</Code>
 
                 <Typography variant="subtitle2" sx={{ mt: 2 }} gutterBottom>
-                  Vikalp B — Ollama (100% free, internet pan na joiye)
+                  Option B — Ollama (entirely free, and works offline)
                 </Typography>
                 <Typography variant="body2" sx={{ mb: 1 }}>
                   Status:{" "}
@@ -223,22 +223,23 @@ AI_PROVIDER=gemini`}</Code>
                     <Chip
                       size="small"
                       color="success"
-                      label={`chalu che — ${d.ollama.models.length} models`}
+                      label={`running — ${d.ollama.models.length} models`}
                     />
                   ) : (
-                    <Chip size="small" label="chalu nathi" />
+                    <Chip size="small" label="not running" />
                   )}
                 </Typography>
-                <Code>{`# 1. ollama.com par thi install karo
-# 2. terminal ma:
+                <Code>{`# 1. Install it from ollama.com
+# 2. In a terminal:
 ollama pull llama3.2
-# 3. .env ma:
+# 3. In .env:
 OLLAMA_MODEL=llama3.2
 AI_PROVIDER=ollama`}</Code>
 
                 <Alert severity="warning" sx={{ mt: 2 }}>
-                  <code>.env</code> badalya pachi <strong>dev server restart</strong>{" "}
-                  karvo pade che (Ctrl+C → <code>npm run dev</code>).
+                  After changing <code>.env</code> you must{" "}
+                  <strong>restart the dev server</strong> (Ctrl+C, then{" "}
+                  <code>npm run dev</code>).
                 </Alert>
               </StepContent>
             </Step>
@@ -247,13 +248,13 @@ AI_PROVIDER=ollama`}</Code>
             <Step expanded>
               <StepLabel icon={<Status ok={health.metaApp.ok} />}>
                 <Typography variant="subtitle1" fontWeight={700}>
-                  Meta app banavo (Instagram + Facebook mate farjiyat)
+                  Create a Meta app (required for Instagram and Facebook)
                 </Typography>
               </StepLabel>
               <StepContent>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Facebook ane Instagram par post karva mate Meta nu developer app
-                  joiye j che — aa vagar koi rite post na thai shake.
+                  Posting to Facebook and Instagram requires a Meta developer app.
+                  There is no way around it.
                 </Typography>
 
                 <Stack spacing={1.25} sx={{ mb: 2 }}>
@@ -270,25 +271,25 @@ AI_PROVIDER=ollama`}</Code>
                     → <strong>Create App</strong> → type: <strong>Business</strong>
                   </Typography>
                   <Typography variant="body2">
-                    2. App ma <strong>Facebook Login</strong> product add karo
+                    2. Add the <strong>Facebook Login</strong> product to the app
                   </Typography>
                   <Typography variant="body2">
                     3. Facebook Login → Settings → <strong>Valid OAuth Redirect URIs</strong>{" "}
-                    ma aa <em>exact</em> URL nakho:
+                    add this <em>exact</em> URL:
                   </Typography>
                 </Stack>
                 <Code>{`${d.appUrl}/api/oauth/meta/callback`}</Code>
 
                 <Typography variant="body2" sx={{ mt: 2, mb: 1 }}>
-                  4. Settings → Basic mathi App ID ane App Secret lai{" "}
-                  <code>.env</code> ma nakho:
+                  4. Take the App ID and App Secret from Settings → Basic and put
+                  them in <code>.env</code>:
                 </Typography>
-                <Code>{`META_APP_ID=tamaru-app-id
-META_APP_SECRET=tamaru-app-secret`}</Code>
+                <Code>{`META_APP_ID=your-app-id
+META_APP_SECRET=your-app-secret`}</Code>
 
                 <Typography variant="body2" sx={{ mt: 2, mb: 1 }}>
-                  5. App Review → Permissions ma aa magavo (Development mode ma
-                  tame jate test kari shako):
+                  5. Request these under App Review → Permissions. In Development
+                  mode you can test them yourself:
                 </Typography>
                 <Code>{`pages_show_list
 pages_manage_posts
@@ -296,7 +297,7 @@ pages_read_engagement
 business_management
 instagram_basic
 instagram_content_publish
-instagram_manage_messages   (auto-DM mate)`}</Code>
+instagram_manage_messages   (for auto-DM)`}</Code>
               </StepContent>
             </Step>
 
@@ -304,7 +305,7 @@ instagram_manage_messages   (auto-DM mate)`}</Code>
             <Step expanded>
               <StepLabel icon={<Status ok={health.facebook.ok || health.instagram.ok} />}>
                 <Typography variant="subtitle1" fontWeight={700}>
-                  Accounts jodo
+                  Connect your accounts
                 </Typography>
               </StepLabel>
               <StepContent>
@@ -320,12 +321,12 @@ instagram_manage_messages   (auto-DM mate)`}</Code>
                 </Stack>
 
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  <AlertTitle>Instagram mate jaruri</AlertTitle>
-                  Tamaru Instagram <strong>Business</strong> ke{" "}
-                  <strong>Creator</strong> account hovu joiye, ane e ek Facebook
-                  Page saathe <strong>jodelu</strong> hovu joiye. (Instagram app →
-                  Settings → Account type → Switch to professional; pachi Page
-                  saathe link karo.) Personal IG account thi API post na thai shake.
+                  <AlertTitle>Required for Instagram</AlertTitle>
+                  Your Instagram account must be a <strong>Business</strong> or{" "}
+                  <strong>Creator</strong> account, and it must be{" "}
+                  <strong>linked</strong> to a Facebook Page. (In the Instagram app:
+                  Settings → Account type → Switch to professional, then link the
+                  Page.) A personal account cannot post through the API.
                 </Alert>
 
                 <Button
@@ -338,7 +339,7 @@ instagram_manage_messages   (auto-DM mate)`}</Code>
                 </Button>
                 {!health.metaApp.ok && (
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                    Pehla step 2 (Meta app) puri karo.
+                    Finish step 2 (the Meta app) first.
                   </Typography>
                 )}
               </StepContent>
@@ -348,25 +349,25 @@ instagram_manage_messages   (auto-DM mate)`}</Code>
             <Step expanded>
               <StepLabel icon={<Status ok={done === 4} />}>
                 <Typography variant="subtitle1" fontWeight={700}>
-                  Post banavo
+                  Make your first post
                 </Typography>
               </StepLabel>
               <StepContent>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Badhu taiyar thay etle:
+                  Once everything above is ready:
                 </Typography>
                 <Stack spacing={1.25} sx={{ mb: 2 }}>
                   <Typography variant="body2">
-                    • <strong>Products</strong> → product ni link paste karo → AI
-                    caption + image + IG/FB post aapoaap
+                    • <strong>Products</strong> — paste a product link and get the
+                    caption, image and Instagram/Facebook post automatically
                   </Typography>
                   <Typography variant="body2">
-                    • <strong>Posts</strong> → topic lakho, ghana accounts select
-                    karo, schedule karo
+                    • <strong>Posts</strong> — write a topic, pick several accounts,
+                    schedule it
                   </Typography>
                   <Typography variant="body2">
-                    • <strong>Auto DM</strong> → comment par auto reply + product
-                    link DM
+                    • <strong>Auto DM</strong> — reply to comments automatically and
+                    send the product link by direct message
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -377,7 +378,7 @@ instagram_manage_messages   (auto-DM mate)`}</Code>
                     Posts
                   </Button>
                   <Button component={Link} href="/admin/integrations" variant="outlined">
-                    AI tools test karo
+                    Test the AI services
                   </Button>
                 </Stack>
               </StepContent>
@@ -394,22 +395,22 @@ instagram_manage_messages   (auto-DM mate)`}</Code>
           </Typography>
           <Divider sx={{ mb: 2 }} />
           <Typography variant="body2" sx={{ mb: 2 }}>
-            Comment aave tyare auto DM javu hoy to Meta ne aapno webhook aapvo
-            pade. <strong>Meta ne public https URL joiye</strong> — localhost
-            nahi chale, etle ngrok jevu tunnel vapro.
+            For a direct message to go out when someone comments, Meta needs a
+            webhook pointing at this app. <strong>Meta requires a public https
+            URL</strong> — localhost will not work, so use a tunnel such as ngrok.
           </Typography>
-          <Code>{`# 1. tunnel chalu karo
+          <Code>{`# 1. Start a tunnel
 npx ngrok http 3000
 
-# 2. Meta app -> Webhooks -> Page ane Instagram
+# 2. Meta app -> Webhooks -> Page and Instagram
 Callback URL : https://<ngrok-url>/api/webhooks/meta
-Verify Token : (.env no META_WEBHOOK_VERIFY_TOKEN)
+Verify Token : (META_WEBHOOK_VERIFY_TOKEN from .env)
 
-# 3. Subscribe karo
+# 3. Subscribe to
 Page      -> feed
 Instagram -> comments`}</Code>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-            Verify token .env ma {d.webhookVerifyTokenSet ? "set che ✓" : "set nathi"}
+            The verify token is {d.webhookVerifyTokenSet ? "set in .env" : "not set in .env"}
           </Typography>
         </CardContent>
       </Card>

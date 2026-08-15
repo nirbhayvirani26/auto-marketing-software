@@ -23,6 +23,11 @@ export const GET = handle(async () => {
       _id: String(avatar._id),
       photoUrls: (avatar.referencePhotos ?? []).map((id) => `/api/media/${id}`),
       primaryPhotoUrl: avatar.primaryPhoto ? `/api/media/${avatar.primaryPhoto}` : null,
+      generatedViews: (avatar.generatedViews ?? []).map((view) => ({
+        key: view.key,
+        label: view.label,
+        url: `/api/media/${view.media}`,
+      })),
     })),
   );
 });
@@ -78,7 +83,7 @@ export const POST = handle(async (request) => {
     kind: "image",
   });
   if (photos.length === 0) {
-    return fail("Avatar mate ochha ma ochho ek photo joiye", 422);
+    return fail("An avatar needs at least one photo", 422);
   }
 
   let described: Partial<z.infer<typeof createSchema>> = {};
@@ -177,7 +182,7 @@ export const PATCH = handle(async (request) => {
     update,
     { new: true },
   );
-  if (!avatar) return fail("Avatar madyo nahi", 404);
+  if (!avatar) return fail("Avatar not found", 404);
 
   return ok(avatar);
 });
@@ -187,14 +192,14 @@ export const DELETE = handle(async (request) => {
   if ("response" in ctx) return ctx.response;
 
   const id = new URL(request.url).searchParams.get("id");
-  if (!id) return fail("Avatar id joiye", 400);
+  if (!id) return fail("An avatar id is required", 400);
 
   const avatar = await Avatar.findOneAndUpdate(
     { _id: id, brand: ctx.brandId },
     { active: false, isDefault: false },
     { new: true },
   );
-  if (!avatar) return fail("Avatar madyo nahi", 404);
+  if (!avatar) return fail("Avatar not found", 404);
 
   return ok({ deleted: true });
 });

@@ -57,7 +57,7 @@ export async function requireOrg(): Promise<
   }
 
   const tenant = await loadTenant(auth.session.org);
-  if (!tenant) return { response: fail("Organization ke plan madyu nahi", 404) };
+  if (!tenant) return { response: fail("Organization or plan not found", 404) };
 
   return { session: auth.session, orgId: auth.session.org, tenant };
 }

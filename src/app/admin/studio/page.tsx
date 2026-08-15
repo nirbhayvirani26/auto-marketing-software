@@ -89,6 +89,7 @@ type Job = {
   currentStep: { key: string; label: string; note?: string } | null;
   steps: Step[];
   error?: string;
+  warnings?: string[];
   duration?: number;
   videoUrl?: string | null;
   previewUrl?: string | null;
@@ -197,12 +198,12 @@ export default function StudioPage() {
         const next = await apiFetch<Job>(`/api/studio/jobs/${job.id}`);
         setJob(next);
         if (next.status === "done") {
-          setNotice("Reel taiyar che 🎬");
+          setNotice("Your reel is ready");
         } else if (next.status === "failed") {
-          setError(next.error ?? "Reel banavtaa bhool thai");
+          setError(next.error ?? "Something went wrong while building the reel");
         }
       } catch {
-        // Ek poll chuki jaay to vandho nahi — pachi ni try ma male jashe.
+        // Missing one poll is harmless — the next one picks it up.
       }
     }, 3000);
 
@@ -243,7 +244,7 @@ export default function StudioPage() {
   /* ---- Generate ---- */
   async function generate() {
     if (images.length === 0) {
-      setError("Pehla product ni image upload karo");
+      setError("Upload a product photo first");
       return;
     }
     setStarting(true);
@@ -258,8 +259,8 @@ export default function StudioPage() {
           method: "POST",
           json: {
             imageAssetIds: images.map((i) => i.id),
-            // Ghana product hoy to "multi" j joiye — avatar to andar na
-            // scenes ma tya pan vaparay che.
+            // Several products always means "multi"; the avatar is still used
+            // inside the individual scenes.
             mode: reference
               ? "reference"
               : images.length > 1
@@ -330,7 +331,7 @@ export default function StudioPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Reel Studio"
-        subtitle="Fakt product ni image aapo — AI baki badhu kare che: script, reel, music, caption, hashtags ane auto post"
+        subtitle="Give it a product photo. It handles the rest — script, reel, music, captions, hashtags and publishing."
       />
 
       {error && (
@@ -352,11 +353,11 @@ export default function StudioPage() {
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  1 · Product ni image
+                  1 · Product photo
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Ek image = ek product ni reel. Ghani image mukho to badha
-                  product ni ek j collection reel banse.
+                  One photo makes a reel for one product. Add several and they
+                  become a single collection reel.
                 </Typography>
 
                 <input
@@ -392,7 +393,7 @@ export default function StudioPage() {
                     <>
                       <AddPhotoIcon color="primary" sx={{ fontSize: 36 }} />
                       <Typography variant="body2" sx={{ mt: 1 }}>
-                        Image ahiya khenchi ne mukho, ke click karo
+                        Drop an image here, or click to choose
                       </Typography>
                     </>
                   )}
@@ -447,7 +448,7 @@ export default function StudioPage() {
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  2 · Kevi reel joiye
+                  2 · What kind of reel
                 </Typography>
 
                 <Stack spacing={2.5} sx={{ mt: 2 }}>
@@ -476,11 +477,11 @@ export default function StudioPage() {
                     label="Avatar (marji nu)"
                     value={form.avatarId}
                     onChange={(e) => setForm({ ...form, avatarId: e.target.value })}
-                    helperText="Avatar hoy to e product pehri ne reel ma dekhaay che"
+                    helperText="With an avatar chosen, the reel shows that person wearing the product"
                     fullWidth
                     size="small"
                   >
-                    <MenuItem value="">Avatar vagar — fakt product</MenuItem>
+                    <MenuItem value="">No avatar — the product on its own</MenuItem>
                     {avatars.map((avatar) => (
                       <MenuItem key={avatar._id} value={avatar._id}>
                         {avatar.name}
@@ -504,7 +505,7 @@ export default function StudioPage() {
                   </TextField>
 
                   <TextField
-                    label="Product vishe kaink kehvu che? (marji nu)"
+                    label="Anything to add about the product? (optional)"
                     value={form.hint}
                     onChange={(e) => setForm({ ...form, hint: e.target.value })}
                     placeholder="Dakhla tarike: pure cotton, machine washable, 6 colour ma"
@@ -512,7 +513,7 @@ export default function StudioPage() {
                     rows={2}
                     fullWidth
                     size="small"
-                    helperText="AI image joine j badhu kadhe che — pan tame kaho e ne vadhu maan aape"
+                    helperText="The AI works it out from the photo, but what you write here carries more weight"
                   />
 
                   <Stack direction="row" spacing={2}>
@@ -559,8 +560,8 @@ export default function StudioPage() {
                       Reference reel (marji nu)
                     </Typography>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                      Koi reel game to eni STYLE ni nakal thashe — tamara product
-                      ane tamari avatar sathe. (Video download karine ahiya mukho.)
+                      Like someone else's reel? Its STYLE gets copied — with your
+                      product and your avatar. (Download the video and drop it here.)
                     </Typography>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Button
@@ -569,7 +570,7 @@ export default function StudioPage() {
                         startIcon={<VideoFileIcon />}
                         onClick={() => referenceInput.current?.click()}
                       >
-                        Video mukho
+                        Upload video
                       </Button>
                       {reference && (
                         <Chip
@@ -592,7 +593,7 @@ export default function StudioPage() {
               disabled={busy || starting || images.length === 0}
               sx={{ py: 1.5 }}
             >
-              {busy ? "Banai rahyu che…" : starting ? "Shuru karie chie…" : "Reel banavo"}
+              {busy ? "Building…" : starting ? "Starting…" : "Create reel"}
             </Button>
           </Stack>
         </Grid>
@@ -604,13 +605,13 @@ export default function StudioPage() {
               <CardContent sx={{ textAlign: "center", py: 10 }}>
                 <MovieIcon sx={{ fontSize: 64, color: "text.disabled" }} />
                 <Typography variant="h6" sx={{ mt: 2 }}>
-                  Reel ahiya dekhashe
+                  Your reel appears here
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 420, mx: "auto" }}>
-                  Image mukho ane &quot;Reel banavo&quot; dabavo. AI image joine
-                  product samjse, atyare je trending che e shodhse, script lakhse,
-                  video banavse, music naakhse ane Instagram + Facebook mate alag
-                  alag caption lakhse.
+                  Add a photo and press &quot;Create reel&quot;. It reads the photo to
+                  understand the product, finds what is trending right now, writes a
+                  script, renders the video, adds music, and writes a separate
+                  caption for Instagram and for Facebook.
                 </Typography>
               </CardContent>
             </Card>
@@ -623,7 +624,7 @@ export default function StudioPage() {
             <Card sx={{ mt: 3 }}>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  Publish karo
+                  Publish
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   Instagram ma je jashe e j Facebook ma pan jashe — pan dareak
@@ -681,11 +682,11 @@ export default function StudioPage() {
                     size="small"
                     fullWidth
                   >
-                    <MenuItem value="now">Atyare j publish karo</MenuItem>
+                    <MenuItem value="now">Publish now</MenuItem>
                     <MenuItem value="auto">
                       Sauthi saara vakhate apoaap goothvo (recommended)
                     </MenuItem>
-                    <MenuItem value="draft">Fakt draft banavo</MenuItem>
+                    <MenuItem value="draft">Save as a draft</MenuItem>
                   </TextField>
 
                   <FormControlLabel
@@ -700,7 +701,7 @@ export default function StudioPage() {
                         }
                       />
                     }
-                    label="Hashtag pehla comment ma mukho (Instagram par saru dekhay)"
+                    label="Put hashtags in the first comment (cleaner on Instagram)"
                   />
 
                   <Button
@@ -709,7 +710,7 @@ export default function StudioPage() {
                     onClick={publish}
                     disabled={publishing || publishForm.accountIds.length === 0}
                   >
-                    {publishing ? "Mokli rahya chie…" : "Publish karo"}
+                    {publishing ? "Publishing…" : "Publish"}
                   </Button>
 
                   {publishResult && (
@@ -722,7 +723,7 @@ export default function StudioPage() {
                             <>
                               {" "}
                               <a href={row.permalink} target="_blank" rel="noreferrer">
-                                jovo ↗
+                                view ↗
                               </a>
                             </>
                           )}
@@ -770,7 +771,7 @@ function JobPanel({
             <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 1 }}>
               <CircularProgress size={20} />
               <Typography variant="subtitle1" fontWeight={600}>
-                {job.currentStep?.label ?? "Shuru thai rahyu che…"}
+                {job.currentStep?.label ?? "Starting…"}
               </Typography>
               <Box sx={{ flex: 1 }} />
               <Typography variant="body2" color="text.secondary">
@@ -787,9 +788,22 @@ function JobPanel({
         )}
 
         {job.status === "failed" && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            <AlertTitle>Reel na banyu</AlertTitle>
+          <Alert severity="error" sx={{ mb: 2, whiteSpace: "pre-line" }}>
+            <AlertTitle>The reel could not be built</AlertTitle>
             {job.error}
+          </Alert>
+        )}
+
+        {(job.warnings?.length ?? 0) > 0 && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <AlertTitle>The reel was built, with limitations</AlertTitle>
+            <Stack component="ul" sx={{ pl: 2, m: 0 }} spacing={0.5}>
+              {job.warnings?.map((warning) => (
+                <Typography component="li" variant="body2" key={warning}>
+                  {warning}
+                </Typography>
+              ))}
+            </Stack>
           </Alert>
         )}
 
@@ -868,7 +882,7 @@ function JobPanel({
                     href={job.videoUrl}
                     download
                   >
-                    Download karo
+                    Download
                   </Button>
                 )}
               </Grid>
@@ -920,7 +934,7 @@ function CopyPanel({ copy, audio }: { copy: Copy; audio: Job["audio"] }) {
             label={`Ranking ${copy.score.score}/100 · ${copy.score.grade}`}
           />
           <Box sx={{ flex: 1 }} />
-          <Tooltip title="Copy karo">
+          <Tooltip title="Copy">
             <IconButton
               size="small"
               onClick={() => navigator.clipboard.writeText(copy.caption)}
@@ -958,10 +972,10 @@ function CopyPanel({ copy, audio }: { copy: Copy; audio: Job["audio"] }) {
 
       {audio && (
         <Alert severity="warning" icon={<MusicIcon />}>
-          <AlertTitle sx={{ fontSize: 14 }}>Trending song joito hoy to</AlertTitle>
+          <AlertTitle sx={{ fontSize: 14 }}>If you want a trending song</AlertTitle>
           <Typography variant="caption" display="block" sx={{ mb: 1 }}>
-            Reel ma <strong>{audio.track ?? "music nathi"}</strong> vagi rahyu che
-            (copyright-free, auto-post thay che).
+            The reel currently plays <strong>{audio.track ?? "no music"}</strong>
+            — copyright-free, so it publishes automatically.
           </Typography>
           <Typography variant="caption" display="block">
             {audio.instagramHint?.howTo}
@@ -991,7 +1005,7 @@ function HashtagPanel({ job }: { job: Job }) {
   const labels: Record<string, string> = {
     broad: "Moti (reach mate)",
     medium: "Vachli (discovery)",
-    niche: "Nani (ahiya tamari post RANK thashe)",
+    niche: "Niche — this is where your post actually ranks",
     branded: "Tamari brand",
   };
 
@@ -999,8 +1013,8 @@ function HashtagPanel({ job }: { job: Job }) {
     <Stack spacing={2}>
       <Alert severity="info" sx={{ py: 0.5 }}>
         <Typography variant="caption">
-          Nana account #fashion jeva mota tag par kadi nahi dekhay. Nani tags par
-          dekhay che — etle e vadhu rakhya che.
+          A small account never surfaces under a huge tag like #fashion. It does
+          surface under small ones, which is why there are more of those here.
         </Typography>
       </Alert>
 
@@ -1024,7 +1038,7 @@ function HashtagPanel({ job }: { job: Job }) {
       {(job.trends?.keywords ?? []).length > 0 && (
         <Box>
           <Typography variant="overline" color="text.secondary">
-            Log aa shabdo search kare che
+            What people are searching for
           </Typography>
           <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
             {job.trends!.keywords.slice(0, 14).map((keyword) => (
@@ -1043,7 +1057,7 @@ function HashtagPanel({ job }: { job: Job }) {
           )
         }
       >
-        Badha hashtag copy karo
+        Copy all hashtags
       </Button>
     </Stack>
   );
@@ -1077,7 +1091,7 @@ function AnalysisPanel({ job }: { job: Job }) {
       {(a.sellingPoints ?? []).length > 0 && (
         <Box>
           <Typography variant="overline" color="text.secondary">
-            Log kem kharide
+            Why people buy it
           </Typography>
           {a.sellingPoints!.map((point, index) => (
             <Typography key={index} variant="body2">
@@ -1090,8 +1104,8 @@ function AnalysisPanel({ job }: { job: Job }) {
       {a.imageQuality && a.imageQuality.score < 7 && (
         <Alert severity="warning" sx={{ py: 0.5 }}>
           <Typography variant="caption">
-            Image ni gunvatta {a.imageQuality.score}/10 —{" "}
-            {a.imageQuality.issues.join(", ")}. Sari image thi reel ghano saro banse.
+            Photo quality {a.imageQuality.score}/10 —{" "}
+            {a.imageQuality.issues.join(", ")}. A better photo makes a noticeably better reel.
           </Typography>
         </Alert>
       )}

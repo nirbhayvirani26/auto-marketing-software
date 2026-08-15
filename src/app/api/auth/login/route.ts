@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { connectDB } from "@/lib/db";
+import { ensureBootstrapped } from "@/lib/bootstrap";
 import { User } from "@/models/User";
 import { Organization } from "@/models/Organization";
 import { signSession, setSessionCookie, type UserRole } from "@/lib/auth";
@@ -15,37 +15,40 @@ const schema = z.object({
 
 export const POST = handle(async (request) => {
   const { email, password } = schema.parse(await request.json());
-  await connectDB();
+
+  // On a brand-new copy of the project this is what creates the owner account,
+  // so the credentials printed in the README actually work.
+  await ensureBootstrapped();
 
   const user = await User.findOne({ email: email.toLowerCase() }).select(
     "+passwordHash",
   );
   if (!user || !user.active) {
-    return fail("Email ke password khoto che", 401);
+    return fail("Incorrect email or password", 401);
   }
 
   const matches = await bcrypt.compare(password, user.passwordHash);
-  if (!matches) return fail("Email ke password khoto che", 401);
+  if (!matches) return fail("Incorrect email or password", 401);
 
-  // Email verify na thayu hoy to navo OTP moklo ane verify screen par moklo.
+  // Unverified email: send a fresh code and send them to the verify screen.
   if (!user.emailVerified) {
     const otp = await issueOtp(user.email, "verify_email");
-    return fail("Email verify baaki che", 403, {
+    return fail("Your email address still needs to be verified", 403, {
       needsVerification: true,
       email: user.email,
       devCode: otp.devCode,
     });
   }
 
-  // Organization suspend thayelu hoy to andar na aavva do (superadmin sivay).
+  // A suspended organization cannot sign in (the super admin always can).
   if (user.role !== "superadmin" && user.organization) {
     const organization = await Organization.findById(user.organization);
     if (!organization) {
-      return fail("Tamaru organization madyu nahi — support no sampark karo", 403);
+      return fail("Your organization could not be found — please contact support", 403);
     }
     if (["suspended", "cancelled"].includes(organization.status)) {
       return fail(
-        `Tamaru account ${organization.status} che. Support no sampark karo.`,
+        `This account is ${organization.status}. Please contact support.`,
         403,
       );
     }
@@ -66,7 +69,7 @@ export const POST = handle(async (request) => {
 
   await logActivity({
     action: "auth.login",
-    message: `${user.email} login thayu`,
+    message: `${user.email} signed in`,
     actor: user.email,
   });
 

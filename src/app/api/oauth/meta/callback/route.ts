@@ -29,7 +29,7 @@ function back(params: Record<string, string>) {
 export const GET = handle(async (request) => {
   const session = await getSession();
   if (!session) {
-    return back({ error: "Session puri thai gai — fari login karo" });
+    return back({ error: "Your session has ended — please sign in again" });
   }
 
   const url = new URL(request.url);
@@ -42,7 +42,7 @@ export const GET = handle(async (request) => {
   }
 
   if (!verifyState(url.searchParams.get("state"))) {
-    return back({ error: "Security check fail thayu (state). Fari try karo." });
+    return back({ error: "The security check failed. Please try again." });
   }
 
   const code = url.searchParams.get("code");

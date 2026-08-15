@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { fail, handle, ok } from "@/lib/api";
 import { requireSuperAdmin } from "@/lib/superadmin";
-import { Organization } from "@/models/Organization";
+import { Organization, type OrganizationDoc } from "@/models/Organization";
 import { Plan } from "@/models/Plan";
 import { User } from "@/models/User";
 import { logActivity } from "@/models/ActivityLog";
@@ -37,7 +37,7 @@ export const GET = handle(async (_request, { params }) => {
     Plan.find({ active: true }).sort({ sortOrder: 1 }).lean(),
   ]);
 
-  if (!organization) return fail("Organization madyu nahi", 404);
+  if (!organization) return fail("Organization not found", 404);
   return ok({ organization, users, plans });
 });
 
@@ -49,7 +49,7 @@ export const PATCH = handle(async (request, { params }) => {
   const body = updateSchema.parse(await request.json());
 
   const organization = await Organization.findById(id);
-  if (!organization) return fail("Organization madyu nahi", 404);
+  if (!organization) return fail("Organization not found", 404);
 
   if (body.name) organization.name = body.name;
   if (body.status) organization.status = body.status;
@@ -72,23 +72,24 @@ export const PATCH = handle(async (request, { params }) => {
       : undefined;
   }
 
-  // null aave to override kadhi naakho (plan nu value pachu chalu thay).
+  // A null value removes the override, which puts the plan's value back in
+  // charge.
   if (body.moduleOverrides) {
-    const map = organization.moduleOverrides ?? new Map<string, boolean>();
+    const overrides = { ...organization.moduleOverrides } as Record<string, boolean>;
     for (const [key, value] of Object.entries(body.moduleOverrides)) {
-      if (value === null) map.delete(key);
-      else map.set(key, value);
+      if (value === null) delete overrides[key];
+      else overrides[key] = value;
     }
-    organization.moduleOverrides = map;
+    organization.moduleOverrides = overrides as OrganizationDoc["moduleOverrides"];
   }
 
   if (body.limitOverrides) {
-    const map = organization.limitOverrides ?? new Map<string, number>();
+    const overrides = { ...organization.limitOverrides } as Record<string, number>;
     for (const [key, value] of Object.entries(body.limitOverrides)) {
-      if (value === null) map.delete(key);
-      else map.set(key, value);
+      if (value === null) delete overrides[key];
+      else overrides[key] = value;
     }
-    organization.limitOverrides = map;
+    organization.limitOverrides = overrides as OrganizationDoc["limitOverrides"];
   }
 
   await organization.save();

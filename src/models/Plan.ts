@@ -1,68 +1,4 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
-
-/**
- * Vechvana plans. Super admin aa banave/badle che; organization ek plan par
- * hoy che ane ena limits pramane j kaam kari shake.
- *
- * `-1` no matlab unlimited.
- */
-const PlanSchema = new Schema(
-  {
-    key: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    name: { type: String, required: true, trim: true },
-    description: { type: String, trim: true },
-
-    priceMonthly: { type: Number, default: 0 },
-    priceYearly: { type: Number, default: 0 },
-    currency: { type: String, default: "INR" },
-
-    limits: {
-      // Agency plan ma ek j account ghani organizations chalavi shake
-      organizations: { type: Number, default: 1 },
-      brands: { type: Number, default: 1 },
-      socialAccounts: { type: Number, default: 3 },
-      postsPerMonth: { type: Number, default: 100 },
-      reelsPerMonth: { type: Number, default: 30 },
-      users: { type: Number, default: 1 },
-      automations: { type: Number, default: 2 },
-      commentRules: { type: Number, default: 0 },
-    },
-
-    /**
-     * Kaya modules aa plan ma chalu che. Super admin per-organization aane
-     * override pan kari shake.
-     */
-    modules: {
-      posts: { type: Boolean, default: true },
-      campaigns: { type: Boolean, default: true },
-      automations: { type: Boolean, default: true },
-      autoDm: { type: Boolean, default: false },
-      aiGeneration: { type: Boolean, default: true },
-      // Reel Studio — image thi reel + auto post
-      reels: { type: Boolean, default: true },
-      n8n: { type: Boolean, default: false },
-      apiTokens: { type: Boolean, default: false },
-      whiteLabel: { type: Boolean, default: false },
-      analytics: { type: Boolean, default: false },
-    },
-
-    // Marketing page par dekhaadva mate
-    highlights: { type: [String], default: [] },
-    popular: { type: Boolean, default: false },
-    sortOrder: { type: Number, default: 0 },
-    visible: { type: Boolean, default: true },
-    active: { type: Boolean, default: true },
-  },
-  { timestamps: true },
-);
-
-export type PlanDoc = InferSchemaType<typeof PlanSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
-
-export const Plan: Model<PlanDoc> =
-  (mongoose.models.Plan as Model<PlanDoc>) ||
-  mongoose.model<PlanDoc>("Plan", PlanSchema);
+import { model, Schema, type BaseFields } from "@/lib/localdb";
 
 export type ModuleKey =
   | "posts"
@@ -86,12 +22,86 @@ export type LimitKey =
   | "automations"
   | "commentRules";
 
-/** Nava install mate default plans. Super admin pachi badli shake. */
+/**
+ * A sellable plan. The super admin creates and edits these; every organization
+ * sits on exactly one and works within its limits.
+ *
+ * A limit of `-1` means unlimited.
+ */
+export type PlanDoc = BaseFields & {
+  key: string;
+  name: string;
+  description?: string;
+  priceMonthly: number;
+  priceYearly: number;
+  currency: string;
+  limits: Record<LimitKey, number>;
+  modules: Record<ModuleKey, boolean>;
+  /** Shown on the public pricing page. */
+  highlights: string[];
+  popular: boolean;
+  sortOrder: number;
+  visible: boolean;
+  active: boolean;
+};
+
+const PlanSchema = new Schema(
+  {
+    key: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    name: { type: String, required: true, trim: true },
+    description: { type: String, trim: true },
+
+    priceMonthly: { type: Number, default: 0 },
+    priceYearly: { type: Number, default: 0 },
+    currency: { type: String, default: "INR" },
+
+    limits: {
+      // On the agency plan one account can run many organizations.
+      organizations: { type: Number, default: 1 },
+      brands: { type: Number, default: 1 },
+      socialAccounts: { type: Number, default: 3 },
+      postsPerMonth: { type: Number, default: 100 },
+      reelsPerMonth: { type: Number, default: 30 },
+      users: { type: Number, default: 1 },
+      automations: { type: Number, default: 2 },
+      commentRules: { type: Number, default: 0 },
+    },
+
+    /**
+     * Which modules this plan unlocks. The super admin can override any of
+     * them for a single organization.
+     */
+    modules: {
+      posts: { type: Boolean, default: true },
+      campaigns: { type: Boolean, default: true },
+      automations: { type: Boolean, default: true },
+      autoDm: { type: Boolean, default: false },
+      aiGeneration: { type: Boolean, default: true },
+      // Reel Studio — turns an image into a reel and publishes it.
+      reels: { type: Boolean, default: true },
+      n8n: { type: Boolean, default: false },
+      apiTokens: { type: Boolean, default: false },
+      whiteLabel: { type: Boolean, default: false },
+      analytics: { type: Boolean, default: false },
+    },
+
+    highlights: { type: [String], default: [] },
+    popular: { type: Boolean, default: false },
+    sortOrder: { type: Number, default: 0 },
+    visible: { type: Boolean, default: true },
+    active: { type: Boolean, default: true },
+  },
+  { timestamps: true },
+);
+
+export const Plan = model<PlanDoc>("Plan", PlanSchema);
+
+/** Plans created on a fresh install. The super admin can change them later. */
 export const DEFAULT_PLANS = [
   {
     key: "starter",
     name: "Starter",
-    description: "Ek brand thi shuru karo",
+    description: "Start with a single brand",
     priceMonthly: 999,
     priceYearly: 9990,
     sortOrder: 1,
@@ -127,7 +137,7 @@ export const DEFAULT_PLANS = [
   {
     key: "pro",
     name: "Pro",
-    description: "Vadhta business mate",
+    description: "For a growing business",
     priceMonthly: 2999,
     priceYearly: 29990,
     popular: true,
@@ -166,7 +176,7 @@ export const DEFAULT_PLANS = [
   {
     key: "agency",
     name: "Agency",
-    description: "Ghani organizations chalavo — clients mate",
+    description: "Run many organizations, one per client",
     priceMonthly: 9999,
     priceYearly: 99990,
     sortOrder: 3,

@@ -85,13 +85,13 @@ export const DELETE = handle(async (request) => {
   if ("response" in ctx) return ctx.response;
 
   const id = new URL(request.url).searchParams.get("id");
-  if (!id) return fail("Token id joiye", 400);
+  if (!id) return fail("A token id is required", 400);
 
   const token = await ApiToken.findOneAndUpdate(
     { _id: id, organization: ctx.orgId },
     { revokedAt: new Date() },
   );
-  if (!token) return fail("Token madyo nahi", 404);
+  if (!token) return fail("Token not found", 404);
 
   await logActivity({
     level: "warning",

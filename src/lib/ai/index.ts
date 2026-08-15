@@ -81,17 +81,17 @@ export async function complete<T>(
       const message =
         error instanceof AiError ? error.message : (error as Error).message;
       failures.push(`${provider.label}: ${message}`);
-      // Chain ma aagal vadho — biju provider try karo.
+      // Move along the chain and try the next provider.
     }
   }
 
   throw new AiError(
-    `Koi pan AI provider kaam na karyo.\n${failures.map((f) => `• ${f}`).join("\n")}`,
+    `No AI provider worked.\n${failures.map((failure) => `• ${failure}`).join("\n")}`,
     chain[0].key,
   );
 }
 
-/** Setup page mate — kayo provider taiyar che. */
+/** Which providers are ready — shown on the Setup page. */
 export function providerStatus() {
   const chain = resolveProviderChain();
   return allProviders().map((provider) => ({

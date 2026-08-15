@@ -63,14 +63,14 @@ export async function distributeReel(
   await connectDB();
 
   const job = await ReelJob.findOne({ _id: options.jobId, brand: options.brandId });
-  if (!job) throw new Error("Reel job madyo nahi");
+  if (!job) throw new Error("Reel job not found");
   if (job.status !== "done") {
     throw new Error(`Reel hju taiyar nathi (status: ${job.status})`);
   }
-  if (!job.output) throw new Error("Reel nu video madyu nahi");
+  if (!job.output) throw new Error("The reel's video could not be found");
 
   const videoAsset = await MediaAsset.findById(job.output);
-  if (!videoAsset) throw new Error("Reel nu video file madyu nahi");
+  if (!videoAsset) throw new Error("The reel's video file could not be found");
 
   // Meta ne download karva mate public URL joiye j che. Juno URL puro thai
   // gayo hoy (tmpfiles jeva host) to navo banavi laiye.

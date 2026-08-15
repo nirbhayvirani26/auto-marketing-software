@@ -16,6 +16,7 @@ const accent = {
 
 export function buildTheme(mode: "light" | "dark"): Theme {
   const isDark = mode === "dark";
+  const border = isDark ? "rgba(255,255,255,0.09)" : "rgba(16,20,34,0.09)";
 
   return createTheme({
     cssVariables: true,
@@ -35,7 +36,7 @@ export function buildTheme(mode: "light" | "dark"): Theme {
         primary: isDark ? "#E8EAF0" : "#1A1D26",
         secondary: isDark ? "#9AA1B1" : "#5C6478",
       },
-      divider: isDark ? "rgba(255,255,255,0.10)" : "rgba(16,20,34,0.10)",
+      divider: border,
     },
     shape: { borderRadius: 12 },
     typography: {
@@ -55,21 +56,23 @@ export function buildTheme(mode: "light" | "dark"): Theme {
             backgroundColor: isDark ? "#2C313C" : "#CBD0DC",
             borderRadius: 8,
           },
+          "*::-webkit-scrollbar-track": { background: "transparent" },
         },
       },
       MuiPaper: {
-        styleOverrides: {
-          root: { backgroundImage: "none" },
-        },
+        styleOverrides: { root: { backgroundImage: "none" } },
       },
       MuiCard: {
         defaultProps: { elevation: 0 },
         styleOverrides: {
-          root: {
-            border: `1px solid ${
-              isDark ? "rgba(255,255,255,0.08)" : "rgba(16,20,34,0.08)"
-            }`,
-          },
+          root: { border: `1px solid ${border}` },
+        },
+      },
+      MuiCardHeader: {
+        styleOverrides: {
+          root: { paddingBottom: 8 },
+          title: { fontSize: 16, fontWeight: 650 },
+          subheader: { fontSize: 13 },
         },
       },
       MuiButton: {
@@ -84,8 +87,34 @@ export function buildTheme(mode: "light" | "dark"): Theme {
       },
       MuiTableCell: {
         styleOverrides: {
-          head: { fontWeight: 700, whiteSpace: "nowrap" },
+          head: {
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+            fontSize: 12,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            color: isDark ? "#9AA1B1" : "#5C6478",
+          },
+          root: { borderColor: border },
         },
+      },
+      MuiTableRow: {
+        styleOverrides: {
+          root: {
+            "&:last-child td": { borderBottom: 0 },
+          },
+        },
+      },
+      MuiDialog: {
+        styleOverrides: {
+          paper: { backgroundImage: "none" },
+        },
+      },
+      MuiTooltip: {
+        defaultProps: { arrow: true },
+      },
+      MuiAlert: {
+        styleOverrides: { root: { borderRadius: 12 } },
       },
     },
   });

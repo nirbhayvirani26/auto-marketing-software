@@ -32,8 +32,8 @@ export const POST = handle(async (request) => {
   const form = await request.formData();
   const files = form.getAll("files").filter((f): f is File => f instanceof File);
 
-  if (files.length === 0) return fail("Ek pan file na madi", 400);
-  if (files.length > 20) return fail("Ek var ma 20 thi vadhare file nahi", 400);
+  if (files.length === 0) return fail("No file was received", 400);
+  if (files.length > 20) return fail("At most 20 files at a time", 400);
 
   const role = (form.get("role") as MediaRole | null) ?? "product";
   const makePublic = form.get("makePublic") === "true";
@@ -164,10 +164,10 @@ export const DELETE = handle(async (request) => {
   if ("response" in ctx) return ctx.response;
 
   const id = new URL(request.url).searchParams.get("id");
-  if (!id) return fail("Media id joiye", 400);
+  if (!id) return fail("A media id is required", 400);
 
   const asset = await MediaAsset.findOneAndDelete({ _id: id, brand: ctx.brandId });
-  if (!asset) return fail("Media madyu nahi", 404);
+  if (!asset) return fail("Media not found", 404);
 
   return ok({ deleted: true });
 });

@@ -1,20 +1,20 @@
 /**
- * Reel banavvano aakho pipeline.
+ * The complete reel pipeline.
  *
- *   upload kareli image
- *        ↓  vision — aa su che, kona mate che
- *        ↓  trends — atyare log su shodhe che
- *        ↓  script — kaya shot, kayo text, ketli var
- *        ↓  images — je scene mate joiye e AI banave (avatar + kapda sathe)
- *        ↓  music  — mood pramane royalty-free track
- *        ↓  voice  — (marji nu) voiceover
- *        ↓  render — ffmpeg thi 1080x1920 mp4
- *        ↓  copy   — Instagram ane Facebook mate alag caption
- *        ↓  hosting— public URL (Meta ne download karva mate)
+ *   an uploaded photo
+ *        ↓  vision  — what it is, and who it is for
+ *        ↓  trends  — what people are searching for right now
+ *        ↓  script  — which shots, which text, for how long
+ *        ↓  images  — the AI builds the scenes it needs (avatar and garment)
+ *        ↓  music   — a royalty-free track that matches the mood
+ *        ↓  voice   — an optional voiceover
+ *        ↓  render  — ffmpeg produces a 1080x1920 mp4
+ *        ↓  copy    — a separate caption for Instagram and for Facebook
+ *        ↓  hosting — a public URL, because Meta downloads the file itself
  *
- * Dareak step ReelJob ma lakhay che — kyare, ketli var, kayo provider,
- * ane fail thay to su. Etle UI ma live progress dekhay che ane bhool
- * kya thai e sidhu khabar pade che.
+ * Every step is written into the ReelJob as it happens: when, how long, which
+ * provider, and what went wrong. That is what drives the live progress in the
+ * UI, and what makes a failure point at the exact step that caused it.
  */
 
 import path from "node:path";
@@ -61,23 +61,23 @@ import { analyzeReference, type ReferenceAnalysis } from "./reference";
 
 export type GenerateReelInput = {
   brandId: string;
-  /** Upload kareli images na MediaAsset id. */
+  /** MediaAsset ids of the uploaded photos. */
   imageAssetIds: string[];
   mode?: "single" | "multi" | "tryon" | "reference";
   avatarId?: string;
   referenceVideoAssetId?: string;
   productId?: string;
-  /** 15-90 second. Default 40. */
+  /** Between 15 and 90 seconds. Defaults to 40. */
   targetDuration?: number;
   language?: string;
   tone?: string;
-  /** User e product vishe kaink lakhyu hoy to. */
+  /** Anything the seller wrote about the product. */
   hint?: string;
   price?: string;
   productUrl?: string;
   voiceover?: boolean;
   createdBy?: string;
-  /** Ready job ma chalavvu hoy to (background worker). */
+  /** Run inside an existing job — used by the background worker. */
   jobId?: string;
 };
 
@@ -104,8 +104,8 @@ export type GenerateReelResult = {
  * ------------------------------------------------------------------ */
 
 /**
- * ffmpeg badha format nathi samajtu (HEIC, kyarek CMYK JPEG). Etle render
- * pehla dareak image ne saado sRGB JPEG banavi daiye chie.
+ * ffmpeg does not understand every format (HEIC, and CMYK JPEGs sometimes),
+ * so each image is converted to a plain sRGB JPEG before rendering.
  */
 async function renderableImage(asset: MediaAssetDocument, dir: string): Promise<string> {
   const localPath = await ensureLocalPath(asset);
@@ -115,7 +115,7 @@ async function renderableImage(asset: MediaAssetDocument, dir: string): Promise<
       const meta = await sharp(localPath).metadata();
       if (meta.space !== "cmyk" && meta.width && meta.width <= 4000) return localPath;
     } catch {
-      /* niche convert karie chie */
+      /* fall through and convert below */
     }
   }
 
@@ -137,7 +137,7 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ value: T; ms: number }>
 }
 
 /* ------------------------------------------------------------------ *
- *  Mukhya function
+ *  The pipeline
  * ------------------------------------------------------------------ */
 
 export async function generateReel(
@@ -148,16 +148,16 @@ export async function generateReel(
   const warnings: string[] = [];
 
   const brand = await Brand.findById(input.brandId);
-  if (!brand) throw new Error("Brand madyu nahi");
+  if (!brand) throw new Error("Brand not found");
 
   const images = await MediaAsset.find({
     _id: { $in: input.imageAssetIds },
     kind: "image",
   });
   if (images.length === 0) {
-    throw new Error("Ek pan image na madi — pehla product ni image upload karo");
+    throw new Error("No image was found — upload a product photo first");
   }
-  // User e je kram ma aapyu e j kram sachvo.
+  // Preserve the order the user uploaded them in.
   images.sort(
     (a, b) =>
       input.imageAssetIds.indexOf(String(a._id)) -
@@ -208,7 +208,7 @@ export async function generateReel(
 
   try {
     /* ================= 1. Vision ================= */
-    await setStep(job._id, "vision", { label: "Image samajie chie", status: "running" });
+    await setStep(job._id, "vision", { label: "Understanding the image", status: "running" });
 
     const buffers = await Promise.all(
       images.map(async (asset) => ({
@@ -220,27 +220,49 @@ export async function generateReel(
     const visionResult = await analyzeProductImages(buffers, {
       hint: input.hint,
       market: process.env.DEFAULT_MARKET || "India",
+      fallbackName: brand.name,
     });
     const analysis = visionResult.data;
 
+    // The reel still gets built when no vision provider answers, but the
+    // seller deserves to know the result is thinner than it should be, and
+    // exactly what would fix it.
+    const visionDegraded =
+      visionResult.provider === "photo-only" ||
+      visionResult.provider === "description-only";
+
     await setStep(job._id, "vision", {
-      status: "done",
+      status: visionDegraded ? "skipped" : "done",
       provider: visionResult.provider,
       ms: visionResult.ms,
-      note: `${analysis.productName} — ${analysis.category}`,
+      note: visionDegraded
+        ? "No AI vision available — continuing from your photos"
+        : `${analysis.productName} — ${analysis.category}`,
     });
 
     job.analysis = analysis;
     await job.save();
 
+    if (visionResult.provider === "photo-only") {
+      warnings.push(
+        "No AI provider could read your photo, so the reel was built from the images alone. " +
+          "Add a line about the product in the box above, or top up an AI key, for a much better caption.",
+      );
+    } else if (visionResult.provider === "description-only") {
+      warnings.push(
+        "No AI provider could read your photo, so the reel was built from your description. " +
+          "Top up an AI key for richer captions and hashtags.",
+      );
+    }
+
     if (analysis.imageQuality.score < 5 && analysis.imageQuality.issues.length) {
       warnings.push(
-        `Image ni gunvatta ochhi lage che (${analysis.imageQuality.issues.join(", ")}) — sari image thi result ghano sudhare.`,
+        `The photo quality looks low (${analysis.imageQuality.issues.join(", ")}) — a better photo improves the result considerably.`,
       );
     }
 
     /* ================= 2. Trends ================= */
-    await setStep(job._id, "trends", { label: "Trending keywords shodhie chie", status: "running" });
+    await setStep(job._id, "trends", { label: "Finding trending keywords", status: "running" });
 
     const trendsRun = await timed(() =>
       buildTrendPack({
@@ -255,7 +277,7 @@ export async function generateReel(
       status: "done",
       ms: trendsRun.ms,
       provider: trends.sources.join("+"),
-      note: `${trends.hashtags.length} hashtag, ${trends.keywords.length} keyword`,
+      note: `${trends.hashtags.length} hashtags, ${trends.keywords.length} keywords`,
     });
 
     job.trends = trends;
@@ -265,12 +287,12 @@ export async function generateReel(
     let referenceStyle: ReferenceAnalysis | undefined;
     if (input.referenceVideoAssetId) {
       await setStep(job._id, "reference", {
-        label: "Reference reel ni style samajie chie",
+        label: "Studying the reference reel's style",
         status: "running",
       });
       try {
         const refAsset = await MediaAsset.findById(input.referenceVideoAssetId);
-        if (!refAsset) throw new Error("Reference video madyo nahi");
+        if (!refAsset) throw new Error("Reference video not found");
 
         const refPath = await ensureLocalPath(refAsset);
         const refRun = await timed(() => analyzeReference(refPath));
@@ -279,10 +301,10 @@ export async function generateReel(
         await setStep(job._id, "reference", {
           status: "done",
           ms: refRun.ms,
-          note: `${referenceStyle.sceneCount} shot, ${referenceStyle.pacing} pacing`,
+          note: `${referenceStyle.sceneCount} shots, ${referenceStyle.pacing} pacing`,
         });
       } catch (error) {
-        warnings.push(`Reference reel vanchi na shakaya: ${(error as Error).message}`);
+        warnings.push(`The reference reel could not be read: ${(error as Error).message}`);
         await setStep(job._id, "reference", {
           status: "failed",
           error: (error as Error).message,
@@ -291,7 +313,7 @@ export async function generateReel(
     }
 
     /* ================= 4. Script ================= */
-    await setStep(job._id, "plan", { label: "Reel no script lakhie chie", status: "running" });
+    await setStep(job._id, "plan", { label: "Writing the reel script", status: "running" });
 
     const planRun = await timed(() =>
       planReel({
@@ -326,11 +348,11 @@ export async function generateReel(
     await setStep(job._id, "plan", {
       status: "done",
       ms: planRun.ms,
-      note: `${plan.scenes.length} scene, ${plan.totalDuration}s — ${plan.concept}`,
+      note: `${plan.scenes.length} scenes, ${plan.totalDuration}s — ${plan.concept}`,
     });
 
     /* ================= 5. Scene ni images ================= */
-    await setStep(job._id, "media", { label: "Scene ni images taiyar karie chie", status: "running" });
+    await setStep(job._id, "media", { label: "Preparing the scene images", status: "running" });
 
     const mediaRun = await timed(() =>
       buildSceneMedia({
@@ -352,7 +374,7 @@ export async function generateReel(
       ms: mediaRun.ms,
       note: [
         `${sceneMedia.length} scene`,
-        `${generatedCount} AI e banaveli`,
+        `${generatedCount} AI-generated`,
         clipCount ? `${clipCount} AI video clip` : "",
       ]
         .filter(Boolean)
@@ -360,7 +382,7 @@ export async function generateReel(
     });
 
     /* ================= 6. Music ================= */
-    await setStep(job._id, "music", { label: "Music pasand karie chie", status: "running" });
+    await setStep(job._id, "music", { label: "Choosing the music", status: "running" });
 
     const mood = (plan.musicMood as MusicMood) || moodForProduct(analysis);
     const music = await pickMusic({
@@ -381,7 +403,7 @@ export async function generateReel(
       warnings.push(
         "Music na madyu — reel music vagar banse. Jamendo ni free key naakho (devportal.jamendo.com) athva potani mp3 upload karo.",
       );
-      await setStep(job._id, "music", { status: "skipped", note: "Koi track na madyo" });
+      await setStep(job._id, "music", { status: "skipped", note: "No track was found" });
     }
 
     /* ================= 7. Voiceover ================= */
@@ -393,7 +415,7 @@ export async function generateReel(
       .join(" ");
 
     if (wantsVoiceover && voiceText.length > 20) {
-      await setStep(job._id, "voiceover", { label: "Voiceover banavie chie", status: "running" });
+      await setStep(job._id, "voiceover", { label: "Recording the voiceover", status: "running" });
       try {
         const voice = await generateVoiceover({
           text: voiceText,
@@ -409,7 +431,7 @@ export async function generateReel(
         });
       } catch (error) {
         voiceoverPath = undefined;
-        warnings.push(`Voiceover na banyu (${(error as Error).message}) — music thi j reel banse.`);
+        warnings.push(`The voiceover could not be made (${(error as Error).message}) — the reel will use music only.`);
         await setStep(job._id, "voiceover", {
           status: "failed",
           error: (error as Error).message,
@@ -420,7 +442,7 @@ export async function generateReel(
     }
 
     /* ================= 8. Render ================= */
-    await setStep(job._id, "render", { label: "Video render karie chie", status: "running" });
+    await setStep(job._id, "render", { label: "Rendering the video", status: "running" });
 
     const scenes: Scene[] = plan.scenes.map((planned, index) => ({
       source: sceneMedia[index].path,
@@ -468,7 +490,7 @@ export async function generateReel(
     });
 
     /* ================= 9. Save + public URL ================= */
-    await setStep(job._id, "upload", { label: "Public URL banavie chie", status: "running" });
+    await setStep(job._id, "upload", { label: "Publishing to a public URL", status: "running" });
 
     const videoAsset = await saveMedia({
       data: await readFile(render.outputPath),
@@ -503,7 +525,7 @@ export async function generateReel(
     });
 
     /* ================= 10. Caption ================= */
-    await setStep(job._id, "copy", { label: "Caption ane hashtags lakhie chie", status: "running" });
+    await setStep(job._id, "copy", { label: "Writing captions and hashtags", status: "running" });
 
     const copyRun = await timed(async () => {
       const [instagram, facebook] = await Promise.all([
@@ -569,17 +591,20 @@ export async function generateReel(
     job.status = "done";
     job.finishedAt = new Date();
     job.ms = Date.now() - started;
+    // The UI polls the job, so anything the seller should know has to live on
+    // the document — returning it to the background worker reaches nobody.
+    job.warnings = warnings;
     await job.save();
 
-    // Vachhe na temp file (scene clips, normalise kareli image, voiceover)
-    // have jarur nathi — video ane keyframes MediaAsset ma save thai gaya che.
-    // Aa na karie to disk dhime dhime bharai jaay.
+    // The intermediate files (scene clips, normalised images, voiceover) are
+    // no longer needed: the video and keyframes are saved as MediaAssets.
+    // Without this the disk fills up run by run.
     await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
 
     /* ---- Automation e kahyu hoy to jate j publish pan kari do ---- */
     if (job.autoDistribute?.enabled) {
       await setStep(job._id, "distribute", {
-        label: "Jate publish karie chie",
+        label: "Publishing automatically",
         status: "running",
       });
       try {
@@ -606,12 +631,12 @@ export async function generateReel(
 
         await setStep(job._id, "distribute", {
           status: "done",
-          note: `${distributed.created.length} post`,
+          note: `${distributed.created.length} posts`,
         });
       } catch (error) {
         job.autoDistribute.error = (error as Error).message;
         await job.save();
-        warnings.push(`Jate publish na thayu: ${(error as Error).message}`);
+        warnings.push(`Automatic publishing failed: ${(error as Error).message}`);
         await setStep(job._id, "distribute", {
           status: "failed",
           error: (error as Error).message,
@@ -644,12 +669,13 @@ export async function generateReel(
     job.error = (error as Error).message;
     job.finishedAt = new Date();
     job.ms = Date.now() - started;
+    job.warnings = warnings;
     await job.save();
 
     await logActivity({
       level: "error",
       action: "reel.failed",
-      message: `Reel fail: ${(error as Error).message}`,
+      message: `Reel failed: ${(error as Error).message}`,
       meta: { jobId: String(job._id) },
     });
 
@@ -663,7 +689,7 @@ export async function generateReel(
 
 type SceneMedia = {
   path: string;
-  assetId?: import("mongoose").Types.ObjectId;
+  assetId?: import("@/lib/localdb").ObjectId;
   source: "uploaded" | "generated" | "tryon";
   /** ffmpeg ne image ane video alag rite khavdavva pade che. */
   kind: "image" | "video";
@@ -729,7 +755,7 @@ async function buildSceneMedia(opts: {
   /**
    * Ek scene nu media — hamesha be tabakke.
    *
-   *   1. STILL image taiyar karo (upload kareli, AI e banaveli, ke try-on)
+   *   1. Prepare the STILL image (uploaded, AI-generated, or a try-on)
    *   2. Plan ma "video" lakhyu hoy to E J IMAGE ne Omni thi halavo
    *
    * Bijo tabakko fail thay to pehla tabakka ni image j vaparie chie — video

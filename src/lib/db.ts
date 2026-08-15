@@ -1,52 +1,41 @@
-import mongoose from "mongoose";
-import { env } from "./env";
+import { existsSync, mkdirSync } from "node:fs";
+
+import { dataDir, flushAllCollections } from "./localdb";
 
 /**
- * Next.js dev mode hot-reloads modules, so the connection is cached on
- * `globalThis` to avoid opening a new pool on every reload.
+ * Database bootstrap.
+ *
+ * There is no server to connect to — the database is the `data/` folder next
+ * to the source code. This module only makes sure that folder exists, so the
+ * rest of the app can keep calling `connectDB()` at the top of a request the
+ * way it always did.
  */
-type MongooseCache = {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
-};
 
-const globalForMongoose = globalThis as unknown as {
-  _mongooseCache?: MongooseCache;
-};
+let ready = false;
 
-const cache: MongooseCache = globalForMongoose._mongooseCache ?? {
-  conn: null,
-  promise: null,
-};
-globalForMongoose._mongooseCache = cache;
-
-export async function connectDB(): Promise<typeof mongoose> {
-  if (cache.conn) return cache.conn;
-
-  if (!cache.promise) {
-    mongoose.set("strictQuery", true);
-    cache.promise = mongoose.connect(env.mongodbUri, {
-      bufferCommands: false,
-      serverSelectionTimeoutMS: 8000,
-      maxPoolSize: 10,
-    });
-  }
-
-  try {
-    cache.conn = await cache.promise;
-  } catch (error) {
-    cache.promise = null;
-    throw error;
-  }
-
-  return cache.conn;
+export async function connectDB(): Promise<void> {
+  if (ready) return;
+  const directory = dataDir();
+  if (!existsSync(directory)) mkdirSync(directory, { recursive: true });
+  ready = true;
 }
 
+/** True whenever the data directory is usable. */
 export async function isDbReachable(): Promise<boolean> {
   try {
     await connectDB();
-    return mongoose.connection.readyState === 1;
+    return true;
   } catch {
     return false;
   }
+}
+
+/** Where the JSON collections live — shown on the Settings page. */
+export function databaseLocation(): string {
+  return dataDir();
+}
+
+/** Forces pending writes to disk. Scripts call this before exiting. */
+export function flushDatabase(): void {
+  flushAllCollections();
 }

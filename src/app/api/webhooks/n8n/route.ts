@@ -64,7 +64,7 @@ export const POST = handle(async (request) => {
 
     case "post.generate": {
       const account = await SocialAccount.findById(body.accountId);
-      if (!account) return fail("Social account madyu nahi", 404);
+      if (!account) return fail("Social account not found", 404);
 
       const [generated] = await generatePosts({
         topic: body.topic,

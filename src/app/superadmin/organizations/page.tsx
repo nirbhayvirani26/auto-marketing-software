@@ -85,7 +85,7 @@ type Org = {
 
 type Plan = { _id: string; key: string; name: string };
 
-/** null = plan nu value vapro; true/false = override. */
+/** null means use the plan's value; true or false overrides it. */
 type TriState = "inherit" | "on" | "off";
 
 export default function SuperAdminOrganizations() {
@@ -177,7 +177,7 @@ export default function SuperAdminOrganizations() {
           ),
         },
       });
-      setNotice(`"${editing.name}" update thayu`);
+      setNotice(`"${editing.name}" was updated`);
       setEditing(null);
       load();
     } catch (e) {
@@ -197,7 +197,7 @@ export default function SuperAdminOrganizations() {
     <Stack spacing={3}>
       <PageHeader
         title="Organizations"
-        subtitle="Kayo user kai organization chalave che, kayo plan, ane su vaparyu"
+        subtitle="Who runs which organization, on which plan, and how much they have used."
         action={
           <Button variant="outlined" startIcon={<RefreshIcon />} onClick={load}>
             Refresh
@@ -237,7 +237,7 @@ export default function SuperAdminOrganizations() {
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Koi organization madyu nahi.
+                      No organizations found.
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -314,7 +314,7 @@ export default function SuperAdminOrganizations() {
         fullWidth
         maxWidth="md"
       >
-        <DialogTitle>{editing?.name} — manage karo</DialogTitle>
+        <DialogTitle>Manage {editing?.name}</DialogTitle>
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 1 }}>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
@@ -353,7 +353,7 @@ export default function SuperAdminOrganizations() {
                 Modules
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                &quot;Plan pramane&quot; rakho to plan nu value chale. On/Off karo
+                Leave it on &quot;Plan default&quot; to follow the plan. Switch it on or off
                 to aa organization mate j override thashe.
               </Typography>
               <Divider sx={{ my: 1.5 }} />
@@ -457,7 +457,7 @@ export default function SuperAdminOrganizations() {
             disabled={saving}
             startIcon={saving ? <CircularProgress size={16} /> : undefined}
           >
-            Save karo
+            Save
           </Button>
         </DialogActions>
       </Dialog>

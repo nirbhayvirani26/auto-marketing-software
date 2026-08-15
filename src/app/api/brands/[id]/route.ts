@@ -30,7 +30,7 @@ export const PATCH = handle(async (request, { params }) => {
   const { makeActive, ...body } = updateSchema.parse(await request.json());
 
   const brand = await Brand.findOne({ _id: id, organization: ctx.orgId });
-  if (!brand) return fail("Brand madyu nahi", 404);
+  if (!brand) return fail("Brand not found", 404);
 
   if (Object.keys(body).length > 0) {
     Object.assign(brand, body);
@@ -52,7 +52,7 @@ export const DELETE = handle(async (request, { params }) => {
 
   const { id } = await params;
   const brand = await Brand.findOne({ _id: id, organization: ctx.orgId });
-  if (!brand) return fail("Brand madyu nahi", 404);
+  if (!brand) return fail("Brand not found", 404);
 
   const confirm = new URL(request.url).searchParams.get("confirm");
   if (confirm !== brand.name) {
@@ -67,7 +67,7 @@ export const DELETE = handle(async (request, { params }) => {
     active: true,
   });
   if (remaining <= 1) {
-    return fail("Chhello brand delete na thay — ochha ma ochhu ek joiye", 409);
+    return fail("The last brand cannot be deleted — at least one is required", 409);
   }
 
   const filter = { brand: brand._id };

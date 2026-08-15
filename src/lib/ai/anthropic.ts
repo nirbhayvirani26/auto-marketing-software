@@ -30,7 +30,7 @@ export const anthropicProvider: AiProvider = {
 
   async complete<T>(request: CompletionRequest): Promise<T> {
     if (!apiKey()) {
-      throw new AiError("ANTHROPIC_API_KEY set nathi", "anthropic");
+      throw new AiError("ANTHROPIC_API_KEY is not set", "anthropic");
     }
 
     let response;
@@ -73,15 +73,15 @@ function translate(error: unknown): AiError {
 
     if (/credit balance is too low/i.test(message)) {
       return new AiError(
-        "Anthropic ma credit khutya che. Free vikalp: .env ma AI_PROVIDER=gemini karo (aistudio.google.com par thi free key).",
+        "The Anthropic account is out of credit. Free alternatives: Groq (console.groq.com/keys) or Ollama, which runs on this machine.",
         "anthropic",
       );
     }
     if (error instanceof Anthropic.AuthenticationError) {
-      return new AiError("ANTHROPIC_API_KEY khoto ke expire thayelo che", "anthropic");
+      return new AiError("ANTHROPIC_API_KEY is invalid or has expired", "anthropic");
     }
     if (error instanceof Anthropic.RateLimitError) {
-      return new AiError("Anthropic rate limit — thodi var pachi try karo", "anthropic", true);
+      return new AiError("Anthropic rate limit reached — try again shortly", "anthropic", true);
     }
     return new AiError(`Anthropic: ${message}`, "anthropic", (error.status ?? 0) >= 500);
   }

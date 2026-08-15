@@ -45,7 +45,7 @@ function RegisterForm() {
     apiFetch<PublicPlan[]>("/api/public/plans")
       .then((data) => {
         setPlans(data);
-        // URL ma plan na hoy to pehlo plan default.
+        // With no plan in the URL, default to the first one.
         if (!params.get("plan") && data[0]) {
           setForm((f) => ({ ...f, planKey: data[0].key }));
         }
@@ -62,7 +62,8 @@ function RegisterForm() {
         "/api/auth/register",
         { method: "POST", json: form },
       );
-      // SMTP set na hoy to dev code URL ma lai jaiye jethi turant test thai shake.
+      // Without SMTP configured, carry the code in the URL so the flow can
+      // still be tested immediately.
       const query = new URLSearchParams({ email: result.email });
       if (result.devCode) query.set("dev", result.devCode);
       router.push(`/verify?${query.toString()}`);
@@ -111,9 +112,9 @@ function RegisterForm() {
             >
               <CampaignIcon />
             </Box>
-            <Typography variant="h5">Account banavo</Typography>
+            <Typography variant="h5">Create your account</Typography>
             <Typography variant="body2" color="text.secondary" textAlign="center">
-              14 divas free trial — credit card ni jarur nathi
+              14-day free trial — no credit card required
             </Typography>
           </Stack>
 
@@ -134,7 +135,7 @@ function RegisterForm() {
                 autoFocus
               />
               <TextField
-                label="Company / organization nu naam"
+                label="Company or organization name"
                 value={form.organizationName}
                 onChange={(e) =>
                   setForm({ ...form, organizationName: e.target.value })
@@ -183,16 +184,16 @@ function RegisterForm() {
                 disabled={loading}
                 fullWidth
               >
-                {loading ? "Account banai rahyu che…" : "Account banavo"}
+                {loading ? "Creating your account…" : "Create account"}
               </Button>
             </Stack>
           </Box>
 
           <Divider sx={{ my: 3 }} />
           <Typography variant="body2" textAlign="center">
-            Pehla thi account che?{" "}
+            Already have an account?{" "}
             <Link href="/login" style={{ color: "inherit" }}>
-              <strong>Login karo</strong>
+              <strong>Sign in</strong>
             </Link>
           </Typography>
         </CardContent>

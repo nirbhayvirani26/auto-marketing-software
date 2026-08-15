@@ -56,7 +56,7 @@ export const geminiProvider: AiProvider = {
     const key = apiKey();
     if (!key) {
       throw new AiError(
-        "GEMINI_API_KEY set nathi. aistudio.google.com/apikey par thi FREE key lo.",
+        "GEMINI_API_KEY is not set. Get a free key at aistudio.google.com/apikey.",
         "gemini",
       );
     }
@@ -103,25 +103,41 @@ export const geminiProvider: AiProvider = {
       const message = json.error?.message ?? `HTTP ${response.status}`;
 
       if (response.status === 429) {
-        // "limit: 0" = aa key ne AA MODEL nu free tier apayu j nathi.
-        // E rate limit NATHI — raah jovathi kai nahi thay, bijo model
-        // ke bijo provider joiye.
-        if (message.includes("limit: 0")) {
+        // Google returns 429 for three very different situations, and calling
+        // them all "rate limited" sends people off waiting for a problem that
+        // will never clear on its own.
+
+        // 1. The billing account has no prepaid credit left. Waiting does
+        //    nothing; the account has to be topped up.
+        if (/credits are depleted|billing/i.test(message)) {
           throw new AiError(
-            `Gemini: "${modelName()}" aa key mate chalu nathi (free tier quota 0). ` +
-              `.env ma GEMINI_MODEL=gemini-flash-latest karo, athva Groq vapro (free).`,
+            "The Google account behind this key has no prepaid credit left. " +
+              "Top it up at ai.studio/projects, or switch to a free provider — " +
+              "Groq (console.groq.com/keys) or Ollama, which runs locally.",
             "gemini",
           );
         }
+
+        // 2. "limit: 0" means this key was never granted a free tier for this
+        //    model. Also permanent — a different model or provider is needed.
+        if (message.includes("limit: 0")) {
+          throw new AiError(
+            `Gemini: "${modelName()}" is not enabled for this key (free tier quota is 0). ` +
+              "Set GEMINI_MODEL=gemini-flash-latest in .env, or use Groq, which is free.",
+            "gemini",
+          );
+        }
+
+        // 3. A genuine rate limit. This one really does clear on its own.
         throw new AiError(
-          "Gemini ni rate limit lagi gai. Thodi var pachi apoaap fari try thashe.",
+          "Gemini is rate limited. It will be retried automatically in a moment.",
           "gemini",
           true,
         );
       }
       if (response.status === 400 && /API key not valid/i.test(message)) {
         throw new AiError(
-          "GEMINI_API_KEY khoto che. aistudio.google.com/apikey par thi navo lo.",
+          "GEMINI_API_KEY is invalid. Get a new one at aistudio.google.com/apikey.",
           "gemini",
         );
       }
@@ -142,7 +158,7 @@ export const geminiProvider: AiProvider = {
     try {
       return JSON.parse(text) as T;
     } catch {
-      throw new AiError("Gemini no response JSON ma nathi", "gemini", true);
+      throw new AiError("Gemini's response was not JSON", "gemini", true);
     }
   },
 };

@@ -24,7 +24,7 @@ export const POST = handle(async (request) => {
   if (!result.ok) return fail(result.error ?? "Code verify na thayo", 400);
 
   const user = await User.findOne({ email: email.toLowerCase() });
-  if (!user) return fail("User madyo nahi", 404);
+  if (!user) return fail("User not found", 404);
 
   user.emailVerified = true;
   user.lastLoginAt = new Date();

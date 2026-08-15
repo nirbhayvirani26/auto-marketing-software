@@ -205,7 +205,7 @@ export async function generateVoiceover(
   options: VoiceoverOptions,
 ): Promise<ChainResult<Voiceover>> {
   const text = options.text.trim();
-  if (!text) throw new Error("Voiceover mate text nathi");
+  if (!text) throw new Error("There is no text to speak");
 
   const voice = options.voice || process.env.VOICEOVER_VOICE || "female";
 
@@ -221,7 +221,7 @@ export async function generateVoiceover(
       },
       {
         name: "pollinations-tts",
-        label: "Pollinations TTS (key vagar)",
+        label: "Pollinations TTS (no key needed)",
         free: true,
         configured: () => process.env.MEDIA_ALLOW_ANON_HOSTS !== "false",
         run: (signal) => pollinationsTts(text, voice, signal),
@@ -253,14 +253,14 @@ export function voiceoverStatus() {
       label: "Gemini TTS",
       free: true,
       configured: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
-      note: "Free tier, kudarti awaj. Hindi/Gujarati pan bole che.",
+      note: "Free tier, natural sounding. Speaks Hindi and Gujarati too.",
     },
     {
       key: "pollinations-tts",
       label: "Pollinations TTS",
       free: true,
       configured: process.env.MEDIA_ALLOW_ANON_HOSTS !== "false",
-      note: "Koi key nahi.",
+      note: "No key needed.",
     },
     {
       key: "elevenlabs",

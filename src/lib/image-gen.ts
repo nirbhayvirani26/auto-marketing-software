@@ -1,27 +1,33 @@
 /**
- * Image generation — FREE options pehla.
+ * Post images — one call that returns a URL Instagram will accept.
  *
- * Instagram ne PUBLIC https URL joiye j che, etle je provider sidho public
- * URL aape e sauthi saralo che.
+ * The full pipeline in `media/image-gen.ts` returns raw bytes, because reels
+ * need the file on disk to render. Posts need the opposite: a public https URL,
+ * because Meta downloads the media from its own servers. This module bridges
+ * the two.
  *
- *   pollinations — sav free, koi API key nahi, URL j image che
- *   gemini       — Google Imagen (free tier), base64 pacho aape
- *   none         — koi generation nahi (product ni potani image vaparo)
+ *   1. Nano Banana (Gemini 2.5 Flash Image) generates the picture
+ *   2. `media/hosts.ts` uploads it and hands back a public URL
+ *   3. If either step fails, Pollinations gives a URL that *is* the image, with
+ *      no key and no upload — good enough to keep a campaign moving
  */
 
-export type ImageProviderKey = "pollinations" | "gemini";
+import { generateImage as generatePixels } from "./media/image-gen";
+import { uploadPublic } from "./media/hosts";
+
+export type ImageProviderKey = "nano-banana" | "pollinations";
 
 export type GeneratedImage = {
   url: string;
   provider: ImageProviderKey;
   prompt: string;
-  /** base64 hoy to — host karvu pade. */
-  base64?: string;
+  /** Where the file ended up: cloudinary, imgbb, catbox, pollinations… */
+  host?: string;
 };
 
 /**
- * Pollinations.ai — API key vagar. Prompt URL ma j jaay che ane e URL
- * kayam ek image aape che, etle Instagram ne sidho aapi shakay.
+ * Pollinations.ai needs no API key: the prompt goes in the URL and that URL
+ * always resolves to an image, so it can be handed straight to Instagram.
  */
 function pollinationsUrl(prompt: string, seed?: number): string {
   const encoded = encodeURIComponent(prompt.slice(0, 900));
@@ -29,13 +35,13 @@ function pollinationsUrl(prompt: string, seed?: number): string {
     width: "1080",
     height: "1080",
     nologo: "true",
-    model: "flux",
+    model: process.env.POLLINATIONS_MODEL || "flux",
   });
   if (seed !== undefined) params.set("seed", String(seed));
   return `https://image.pollinations.ai/prompt/${encoded}?${params.toString()}`;
 }
 
-/** URL kharekhar image aape che ke nahi e check kare. */
+/** Confirms a URL really serves an image before Meta is asked to fetch it. */
 async function verifyImageUrl(url: string): Promise<boolean> {
   try {
     const response = await fetch(url, {
@@ -50,100 +56,86 @@ async function verifyImageUrl(url: string): Promise<boolean> {
   }
 }
 
+function geminiConfigured(): boolean {
+  return Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
+}
+
 export function imageProviderStatus() {
   return [
     {
-      key: "pollinations" as const,
-      label: "Pollinations (free, key vagar)",
+      key: "nano-banana" as const,
+      label: "Nano Banana (Gemini 2.5 Flash Image)",
       free: true,
-      configured: true,
-      note: "Koi setup nahi — turant chale che",
+      configured: geminiConfigured(),
+      note: "The default image model. Free tier, and it reads reference photos. Get a key at aistudio.google.com/apikey",
     },
     {
-      key: "gemini" as const,
-      label: "Google Imagen (free tier)",
+      key: "pollinations" as const,
+      label: "Pollinations (no key needed)",
       free: true,
-      configured: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
-      note: "GEMINI_API_KEY joiye",
+      configured: process.env.MEDIA_ALLOW_ANON_HOSTS !== "false",
+      note: "The fallback. Nothing to set up, but it cannot work from a reference photo.",
     },
   ];
 }
 
 /**
- * Product mate image banave. Default provider free che, etle koi key
- * vagar pan kaam kare che.
+ * Produces an image for a post and returns a publicly reachable URL.
+ *
+ * Throws only when every route failed — the caller is then expected to fall
+ * back to the product's own photography.
  */
-export async function generateImage(opts: {
+export async function generateImage(options: {
   prompt: string;
   provider?: ImageProviderKey;
   seed?: number;
+  aspectRatio?: "1:1" | "4:5" | "9:16";
 }): Promise<GeneratedImage> {
-  const provider =
-    opts.provider ??
+  const preferred =
+    options.provider ??
     (process.env.IMAGE_PROVIDER as ImageProviderKey | undefined) ??
-    "pollinations";
+    "nano-banana";
 
-  if (provider === "gemini") {
-    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    if (key) {
-      try {
-        return await generateWithGemini(opts.prompt, key);
-      } catch {
-        // Gemini fail thay to free pollinations par pacha vado.
-      }
+  if (preferred !== "pollinations" && geminiConfigured()) {
+    try {
+      const generated = await generatePixels({
+        prompt: options.prompt,
+        aspectRatio: options.aspectRatio ?? "1:1",
+        seed: options.seed,
+      });
+
+      const hosted = await uploadPublic({
+        data: generated.data.data,
+        filename: `post-${Date.now()}.jpg`,
+        mimeType: generated.data.mimeType,
+        kind: "image",
+      });
+
+      return {
+        url: hosted.data.url,
+        provider: "nano-banana",
+        prompt: options.prompt,
+        host: hosted.data.host,
+      };
+    } catch {
+      // Fall through to the keyless option rather than failing the campaign.
     }
   }
 
-  const url = pollinationsUrl(opts.prompt, opts.seed);
+  const url = pollinationsUrl(options.prompt, options.seed);
 
-  // Pehli var URL hit karvathi image generate thay che (thodi var lage che).
-  // Instagram ne aapya pehla khatri kari laiye.
-  const ok = await verifyImageUrl(url);
-  if (!ok) {
+  // The first request is what actually renders the image, so check it resolves
+  // before handing the URL to Meta.
+  if (!(await verifyImageUrl(url))) {
     throw new Error(
-      "Image generate na thai — thodi var pachi try karo, athva product ni potani image vapro.",
+      "The image could not be generated. Try again in a moment, or use the product's own photo.",
     );
   }
 
-  return { url, provider: "pollinations", prompt: opts.prompt };
-}
-
-async function generateWithGemini(
-  prompt: string,
-  key: string,
-): Promise<GeneratedImage> {
-  const model = process.env.GEMINI_IMAGE_MODEL || "imagen-3.0-generate-002";
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${key}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        instances: [{ prompt }],
-        parameters: { sampleCount: 1, aspectRatio: "1:1" },
-      }),
-      signal: AbortSignal.timeout(120_000),
-    },
-  );
-
-  const json = (await response.json()) as {
-    predictions?: Array<{ bytesBase64Encoded?: string }>;
-    error?: { message?: string };
-  };
-
-  if (!response.ok || json.error) {
-    throw new Error(json.error?.message ?? `Imagen HTTP ${response.status}`);
-  }
-
-  const base64 = json.predictions?.[0]?.bytesBase64Encoded;
-  if (!base64) throw new Error("Imagen e image na aapi");
-
-  // Base64 ne data URL tarike aapiye — UI preview mate. Instagram mate
-  // aane koi public host par mukvu pade (niche note jovo).
   return {
-    url: `data:image/png;base64,${base64}`,
-    base64,
-    provider: "gemini",
-    prompt,
+    url,
+    provider: "pollinations",
+    prompt: options.prompt,
+    host: "pollinations",
   };
 }

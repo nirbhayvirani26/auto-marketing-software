@@ -1,12 +1,14 @@
 /**
- * Media store — badhi image / video / audio file ahiya thi j pasar thay che.
+ * The media store — every image, video and audio file passes through here.
  *
- * Be jagya e rahe che:
- *   disk   — `storage/media/...` — render pipeline ne local file joiye che
- *   public — Cloudinary/Catbox/etc — Meta ne download karva mate URL joiye che
+ * Each file lives in two places:
+ *   on disk — `storage/media/...`, because the render pipeline needs a local
+ *             file to work with
+ *   public  — Cloudinary, Catbox or similar, because Meta downloads the file
+ *             from a URL of its own accord
  *
- * Etle "save karo" ek j call che, ane pachi jarur pade tyare public URL
- * lazily banave che.
+ * Saving is a single call, and the public URL is produced lazily, only when
+ * something actually needs it.
  */
 
 import { randomUUID } from "node:crypto";
@@ -93,8 +95,8 @@ export type SaveMediaInput = {
   width?: number;
   height?: number;
   /**
-   * true  = turant public host par pan chadhavo (Meta ne aapva mate)
-   * false = fakt disk par (intermediate file mate)
+   * true  = also upload to a public host straight away, ready for Meta
+   * false = disk only, which is right for intermediate files
    */
   makePublic?: boolean;
   preferHost?: string;
@@ -277,7 +279,7 @@ export async function saveMediaFromUrl(
 
   const data = Buffer.from(await response.arrayBuffer());
   if (data.length > MAX_DOWNLOAD_BYTES) {
-    throw new Error("File bahu moti che (200MB thi vadhare)");
+    throw new Error("The file is too large (over 200MB)");
   }
 
   const mimeType =

@@ -49,11 +49,11 @@ export const POST = handle(async (request) => {
   const body = schema.parse(await request.json());
 
   if (!body.caption && !body.topic) {
-    return fail("`caption` ke `topic` — be mathi ek joiye", 422);
+    return fail("Provide either `caption` or `topic`", 422);
   }
 
   const brand = await resolveBrand(ctx, body);
-  if (!brand) return fail("Brand madyu nahi", 404);
+  if (!brand) return fail("Brand not found", 404);
 
   // Accounts nakki karo
   const accountFilter: Record<string, unknown> = { brand: brand._id };
@@ -65,7 +65,7 @@ export const POST = handle(async (request) => {
     status: "connected",
   });
   if (accounts.length === 0) {
-    return fail("Ek pan connected account madyu nahi", 404);
+    return fail("No connected account was found", 404);
   }
 
   // Monthly quota
@@ -91,7 +91,7 @@ export const POST = handle(async (request) => {
     if (account.platform === "instagram" && !body.imageUrl) {
       skipped.push({
         account: account.displayName,
-        reason: "Instagram mate imageUrl farjiyat che",
+        reason: "Instagram requires an imageUrl",
       });
       continue;
     }
@@ -101,7 +101,7 @@ export const POST = handle(async (request) => {
 
     if (!body.caption && body.topic) {
       if (!moduleEnabled(ctx.tenant, "aiGeneration")) {
-        return fail("AI generation tamara plan ma nathi", 402);
+        return fail("AI generation is not part of your plan", 402);
       }
 
       const cached = captionCache.get(account.platform);
@@ -201,7 +201,7 @@ export const GET = handle(async (request) => {
   const brand = await resolveBrand(auth.ctx, {
     brandSlug: url.searchParams.get("brandSlug") ?? undefined,
   });
-  if (!brand) return fail("Brand madyu nahi", 404);
+  if (!brand) return fail("Brand not found", 404);
 
   const posts = await Post.find({
     brand: brand._id,

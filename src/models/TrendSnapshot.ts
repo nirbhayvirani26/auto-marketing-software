@@ -1,17 +1,29 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { model, Schema, type BaseFields } from "@/lib/localdb";
 
 /**
- * Trend data cache.
+ * Cached trend data.
  *
- * Google Trends / autocomplete ne dar vakhate hit karvani jarur nathi — ane
- * karie to block thai jaiye. Etle category+geo dith jawab thodo vakhat
- * sachvi rakhie chie.
+ * Google Trends and autocomplete must not be hit on every request — do that
+ * and the requests start getting blocked. So each answer is kept for a while,
+ * keyed by subject and region.
  */
+export type TrendSnapshotDoc = BaseFields & {
+  /** "keywords" | "daily" | "hashtags" */
+  kind: string;
+  /** What it was fetched for — a category or a seed keyword. */
+  subject: string;
+  geo: string;
+  keywords: string[];
+  hashtags: string[];
+  rising: string[];
+  source?: string;
+  /** After this moment the snapshot is refetched, and swept from disk. */
+  expiresAt: Date;
+};
+
 const TrendSnapshotSchema = new Schema(
   {
-    /** "keywords" | "daily" | "hashtags" */
     kind: { type: String, required: true, index: true },
-    /** Jena mate lidhu — category ke seed keyword. */
     subject: { type: String, required: true, trim: true, index: true },
     geo: { type: String, default: "IN", index: true },
 
@@ -20,24 +32,13 @@ const TrendSnapshotSchema = new Schema(
     rising: { type: [String], default: [] },
 
     source: { type: String, trim: true },
-    /**
-     * Aa vakhat pachi navu lavvu pade.
-     * Index niche `expireAfterSeconds` sathe alag thi banavyo che — ahiya
-     * `index: true` na lakhvu, nahi to Mongoose be index banave che.
-     */
     expiresAt: { type: Date, required: true },
   },
   { timestamps: true },
 );
 
 TrendSnapshotSchema.index({ kind: 1, subject: 1, geo: 1 }, { unique: true });
-// Juna snapshot Mongo jate kadhi naakhe.
+// Expired snapshots are removed the next time the collection is read.
 TrendSnapshotSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-export type TrendSnapshotDoc = InferSchemaType<typeof TrendSnapshotSchema> & {
-  _id: mongoose.Types.ObjectId;
-};
-
-export const TrendSnapshot: Model<TrendSnapshotDoc> =
-  (mongoose.models.TrendSnapshot as Model<TrendSnapshotDoc>) ||
-  mongoose.model<TrendSnapshotDoc>("TrendSnapshot", TrendSnapshotSchema);
+export const TrendSnapshot = model<TrendSnapshotDoc>("TrendSnapshot", TrendSnapshotSchema);

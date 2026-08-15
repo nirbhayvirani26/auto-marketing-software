@@ -1,12 +1,15 @@
 /**
- * Vision — "hu khali product ni image aapish" valu kaam ahiya thay che.
+ * Vision — this is what makes "I will just upload a photo" possible.
  *
- * Ek (ke ghani) product image andar aave che, ane bahar aave che aakhi
- * marketing brief: product su che, kaya material nu che, kona mate che,
- * kaya keywords par ranking male, kevi reel banavvi.
+ * One or more product images go in, and a complete marketing brief comes out:
+ * what the product is, what it is made of, who it is for, which keywords it
+ * can rank on, and what kind of reel would sell it.
  *
- * Chaar provider ni chain che jethi ek ni free limit lage to pan atkatu nathi:
- *   gemini (free) → groq (free) → openrouter (free) → anthropic (paid)
+ * Four providers in a chain, so one hitting its free limit does not stop the
+ * work:  gemini (free) → groq (free) → openrouter (free) → anthropic (paid)
+ *
+ * If every provider is unavailable and the seller supplied a description, that
+ * description is used instead. The brief is thinner, but the reel still ships.
  */
 
 import sharp from "sharp";
@@ -15,17 +18,17 @@ import { runChain, apiFetch, FatalError, type ChainResult } from "@/lib/pipeline
 import { parseJsonLoose } from "./openai-compat";
 
 export type VisionImage = {
-  /** Raw bytes — je pan format ma hoy. */
+  /** Raw bytes, in whatever format they arrived. */
   data: Buffer;
   mimeType: string;
 };
 
 export type ProductIntelligence = {
-  /** Product nu vechan-layak naam. */
+  /** A sellable name for the product. */
   productName: string;
   category: string;
   subCategory: string;
-  /** Apparel hoy to reel ma model/avatar pehravi shakay. */
+  /** If it is apparel, an avatar can be shown wearing it. */
   isApparel: boolean;
   apparelType: string;
 
@@ -42,23 +45,23 @@ export type ProductIntelligence = {
 
   keyFeatures: string[];
   sellingPoints: string[];
-  /** Kharidnar ne su feel thay — hook lakhva mate. */
+  /** What the buyer feels — the raw material for a hook. */
   emotionalHooks: string[];
   objections: string[];
 
   suggestedPriceBand: string;
   positioning: string;
 
-  /** Image ma kharekhar su dekhay che (image-gen ne aapva mate). */
+  /** What is literally visible, handed to the image generator. */
   visualDescription: string;
-  /** Reel na background mate suchav. */
+  /** Scene ideas for the reel. */
   sceneSuggestions: string[];
 
-  /** Log lakhi ne shodhe evaa shabdo — SEO no paayo. */
+  /** The words people actually search for — the basis of the SEO. */
   searchKeywords: string[];
   seedHashtags: string[];
 
-  /** Image kevi che — kharab hoy to user ne kahi shakay. */
+  /** How good the photo is, so a poor one can be flagged. */
   imageQuality: {
     score: number;
     issues: string[];
@@ -66,6 +69,17 @@ export type ProductIntelligence = {
 
   confidence: number;
   language: string;
+
+  /**
+   * True when no vision provider was reachable and this brief was assembled
+   * without ever looking at the photo.
+   *
+   * Downstream steps must treat it as "we do not know what this product is".
+   * Guessing from whatever string happens to be available produces confidently
+   * wrong output — a brand name run through Google Autocomplete once yielded
+   * "#mycompanyisnotgivingmysalary" — which is far worse than saying less.
+   */
+  degraded?: boolean;
 };
 
 const VISION_SCHEMA = {
@@ -373,7 +387,7 @@ export async function askVision<T>(
   request: VisionRequest,
   options: { prefer?: string; maxImages?: number } = {},
 ): Promise<ChainResult<T>> {
-  if (images.length === 0) throw new Error("Ek pan image na madi");
+  if (images.length === 0) throw new Error("No image was found");
 
   const prepared = await Promise.all(
     images.slice(0, options.maxImages ?? 6).map((img) => prepareForVision(img)),
@@ -458,44 +472,145 @@ export async function askVision<T>(
  * ------------------------------------------------------------------ */
 
 export type AnalyzeOptions = {
-  /** User e kaink lakhyu hoy to — AI na andaj karta aane vadhu maan aape. */
+  /** Anything the seller wrote — trusted over the model's own guess. */
   hint?: string;
-  /** "India", "US" — keywords ane price band ne aa pramane tune kare. */
+  /** "India", "US" — tunes keywords, price band and occasions. */
   market?: string;
   prefer?: string;
+  /**
+   * A name to fall back on if no vision provider is reachable and the seller
+   * gave no description. The brand name works well here.
+   */
+  fallbackName?: string;
 };
 
 export async function analyzeProductImages(
   images: VisionImage[],
   options: AnalyzeOptions = {},
 ): Promise<ChainResult<ProductIntelligence>> {
-  if (images.length === 0) throw new Error("Ek pan image na madi");
+  if (images.length === 0) throw new Error("No image was found");
 
   // Ghani image hoy to pan 6 thi vadhare vision ne moklvi nathi — kharch ane
   // limit banne vadhi jaay che, ane 6 ma badhu samjai jaay che.
   const used = images.slice(0, 6);
 
-  const result = await askVision<Partial<ProductIntelligence>>(
-    used,
-    {
-      system: SYSTEM,
-      prompt: userPrompt({
-        imageCount: used.length,
-        hint: options.hint,
-        market: options.market || process.env.DEFAULT_MARKET || "India",
-      }),
-      schema: VISION_SCHEMA as unknown as Record<string, unknown>,
-      maxTokens: 8000,
-    },
-    { prefer: options.prefer, maxImages: 6 },
-  );
+  const started = Date.now();
 
-  return { ...result, data: normalise(result.data) };
+  try {
+    const result = await askVision<Partial<ProductIntelligence>>(
+      used,
+      {
+        system: SYSTEM,
+        prompt: userPrompt({
+          imageCount: used.length,
+          hint: options.hint,
+          market: options.market || process.env.DEFAULT_MARKET || "India",
+        }),
+        schema: VISION_SCHEMA as unknown as Record<string, unknown>,
+        maxTokens: 8000,
+      },
+      { prefer: options.prefer, maxImages: 6 },
+    );
+
+    return { ...result, data: normalise(result.data) };
+  } catch (error) {
+    // No vision provider is reachable — out of credit, no key, or an outage.
+    //
+    // Abandoning the reel here would be the wrong call. The photos the seller
+    // uploaded ARE the product, and ffmpeg can still build a real reel out of
+    // them. So the run continues on a deliberately thin brief: whatever the
+    // seller typed, and nothing else. Nothing is guessed or invented — the
+    // caption simply says less.
+    const hint = options.hint?.trim();
+
+    console.warn(
+      `[vision] No provider available (${(error as Error).message}). ` +
+        (hint
+          ? "Falling back to the description you supplied."
+          : "Falling back to a minimal brief — add a description for a better result."),
+    );
+
+    const brief = normalise(
+      hint
+        ? {
+            productName: hint.slice(0, 80),
+            visualDescription: hint,
+            searchKeywords: hint
+              .toLowerCase()
+              .split(/[\s,]+/)
+              .filter((word) => word.length >= 3)
+              .slice(0, 8),
+          }
+        : {
+            // Deliberately left blank. There is no honest product name here,
+            // and a placeholder would be copied into captions and hashtags as
+            // though it were real.
+            productName: "",
+            visualDescription:
+              "The seller's own product photograph, used exactly as uploaded.",
+          },
+    );
+
+    return {
+      // A description is something; a photo we could not read is not.
+      data: { ...brief, degraded: !hint, confidence: hint ? 0.4 : 0 },
+      provider: hint ? "description-only" : "photo-only",
+      attempts: [],
+      ms: Date.now() - started,
+    };
+  }
 }
 
 /**
- * Nana models kyarek field khali chhodi de ke string ni jagya e number aape.
- * Aagal no code kyarey crash na thay e mate ahiya badhu saaf kari daiye.
+ * A brief built from words alone, for when there is no photo to look at — a
+ * product link with a name typed in, say.
+ *
+ * Marked `degraded` when even the name is missing, so downstream steps know
+ * not to invent specifics they were never given.
+ */
+export function briefFromText(options: {
+  name?: string;
+  notes?: string;
+}): ProductIntelligence {
+  const name = options.name?.trim();
+  const notes = options.notes?.trim();
+  const text = [name, notes].filter(Boolean).join(". ");
+
+  return {
+    ...normalise({
+      productName: name ?? "",
+      visualDescription: notes ?? "",
+      searchKeywords: text
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((word) => word.length >= 3)
+        .slice(0, 10),
+    }),
+    degraded: !name,
+    confidence: name ? 0.4 : 0,
+  };
+}
+
+/**
+ * A name safe to show on screen. Falls back to the brand, then to a neutral
+ * word — never into a caption as though it were the product's real name.
+ */
+export function productLabel(
+  product: Pick<ProductIntelligence, "productName" | "subCategory" | "category">,
+  brandName?: string,
+): string {
+  return (
+    product.productName?.trim() ||
+    product.subCategory?.trim() ||
+    brandName?.trim() ||
+    "Your product"
+  );
+}
+
+/**
+ * Smaller models sometimes leave a field out, or return a number where a
+ * string belongs. Everything is cleaned up here so nothing downstream can
+ * ever crash on a malformed response.
  */
 function normalise(raw: Partial<ProductIntelligence>): ProductIntelligence {
   const list = (value: unknown, limit = 30): string[] =>
@@ -512,7 +627,9 @@ function normalise(raw: Partial<ProductIntelligence>): ProductIntelligence {
   const gender = text(raw.targetGender, "unknown").toLowerCase();
 
   return {
-    productName: text(raw.productName, "Product"),
+    // Left empty when genuinely unknown — see `degraded`. Callers that need a
+    // display name use productLabel().
+    productName: text(raw.productName),
     category: text(raw.category, "General"),
     subCategory: text(raw.subCategory),
     isApparel: Boolean(raw.isApparel),
@@ -565,14 +682,14 @@ export function visionStatus() {
       label: "Gemini Vision",
       free: true,
       configured: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
-      note: "Sauthi saaru free — aistudio.google.com/apikey",
+      note: "The best free option — aistudio.google.com/apikey",
     },
     {
       key: "groq",
       label: "Groq Vision",
       free: true,
       configured: Boolean(process.env.GROQ_API_KEY),
-      note: "Bahu fast — console.groq.com/keys",
+      note: "Very fast — console.groq.com/keys",
     },
     {
       key: "openrouter",

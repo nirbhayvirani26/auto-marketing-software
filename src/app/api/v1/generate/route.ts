@@ -25,7 +25,7 @@ export const POST = handle(async (request) => {
   if ("response" in auth) return auth.response;
 
   if (!moduleEnabled(auth.ctx.tenant, "aiGeneration")) {
-    return fail("AI generation tamara plan ma nathi", 402);
+    return fail("AI generation is not part of your plan", 402);
   }
 
   const body = schema.parse(await request.json());
@@ -60,7 +60,7 @@ export const PUT = handle(async (request) => {
   if ("response" in auth) return auth.response;
 
   if (!moduleEnabled(auth.ctx.tenant, "aiGeneration")) {
-    return fail("AI generation tamara plan ma nathi", 402);
+    return fail("AI generation is not part of your plan", 402);
   }
 
   const body = replySchema.parse(await request.json());

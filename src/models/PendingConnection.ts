@@ -1,39 +1,46 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { model, ObjectId, Schema, type BaseFields } from "@/lib/localdb";
 
 /**
- * OAuth callback ma malela accounts ne thodi var mate ahiya rakhiye chie,
- * jethi user "kaya accounts connect karva che" e pasand kari shake.
+ * Accounts returned by the Meta OAuth callback are parked here for a few
+ * minutes so the user can pick which ones to connect.
  *
- * Cookie ma na rakhi shakay — page tokens motta hoy che ane 4KB limit vati jay.
- * TTL index 10 minute pachi record aapoaap kadhi naakhe che.
+ * They cannot live in a cookie: page tokens are long and would blow past the
+ * 4 KB limit. Records expire ten minutes after they are written.
  */
+export type PendingConnectionAccount = {
+  platform: "facebook" | "instagram";
+  displayName?: string;
+  pageId?: string;
+  igUserId?: string;
+  accessToken?: string;
+  avatarUrl?: string;
+};
+
+export type PendingConnectionDoc = BaseFields & {
+  user: ObjectId;
+  accounts: PendingConnectionAccount[];
+};
+
+const PendingAccountSchema = new Schema({
+  platform: { type: String, enum: ["facebook", "instagram"] },
+  displayName: { type: String },
+  pageId: { type: String },
+  igUserId: { type: String },
+  accessToken: { type: String },
+  avatarUrl: { type: String },
+});
+
 const PendingConnectionSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    accounts: [
-      {
-        platform: { type: String, enum: ["facebook", "instagram"] },
-        displayName: String,
-        pageId: String,
-        igUserId: String,
-        accessToken: String,
-        avatarUrl: String,
-      },
-    ],
-    createdAt: { type: Date, default: Date.now },
+    accounts: { type: [PendingAccountSchema], default: [] },
   },
-  { versionKey: false },
+  { timestamps: true },
 );
 
 PendingConnectionSchema.index({ createdAt: 1 }, { expireAfterSeconds: 600 });
 
-export type PendingConnectionDoc = InferSchemaType<
-  typeof PendingConnectionSchema
-> & { _id: mongoose.Types.ObjectId };
-
-export const PendingConnection: Model<PendingConnectionDoc> =
-  (mongoose.models.PendingConnection as Model<PendingConnectionDoc>) ||
-  mongoose.model<PendingConnectionDoc>(
-    "PendingConnection",
-    PendingConnectionSchema,
-  );
+export const PendingConnection = model<PendingConnectionDoc>(
+  "PendingConnection",
+  PendingConnectionSchema,
+);
