@@ -45,16 +45,44 @@ export type ContentJobDoc = BaseFields & {
 
   /* ---- What was asked for ---- */
   sourceImages: ObjectId[];
+  /**
+   * Extra photographs to steer the look — a shot you like, your own styling,
+   * a mood you want matched. They are handed to the image model alongside the
+   * product itself.
+   */
+  referenceImages: ObjectId[];
+  /**
+   * A reel whose STYLE should be copied — its pacing, shot types and cutting
+   * rhythm, never its words or its product.
+   */
+  referenceVideo?: ObjectId;
   productName?: string;
   productUrl?: string;
+  /** A known image for the product, e.g. the thumbnail from a connected store. */
+  productImageUrl?: string;
   price?: string;
   notes?: string;
   avatar?: ObjectId;
   language: string;
   tone?: string;
-  /** Target reel length in seconds. */
+  /**
+   * What to produce.
+   *   all   — a feed image and a reel, the full run
+   *   image — images only, for when you just need product shots
+   *   video — a reel only
+   */
+  outputMode: "all" | "image" | "video";
+
+  /** Image-only settings. */
+  imageCount: number;
+  imageQuality: "standard" | "high";
+  imageAspect: "1:1" | "4:5" | "9:16";
+
+  /** Video settings. */
+  videoCount: number;
   videoSeconds: number;
-  /** Build the reel at all, or stop after the image post. */
+  videoAspect: "9:16" | "1:1" | "16:9";
+  /** Derived from outputMode; kept because the runner reads it everywhere. */
   wantVideo: boolean;
 
   accountIds: string[];
@@ -65,8 +93,12 @@ export type ContentJobDoc = BaseFields & {
   steps: ContentStep[];
 
   /* ---- Results ---- */
-  /** The Nano Banana post image. */
+  /** The Nano Banana post image — the first one, kept for compatibility. */
   postImage?: ObjectId;
+  /** Every image produced this run. */
+  postImages: ObjectId[];
+  /** Every reel produced this run. */
+  reelVideos: ObjectId[];
   /** The finished reel. */
   reelVideo?: ObjectId;
   reelThumbnail?: ObjectId;
@@ -112,14 +144,30 @@ const ContentJobSchema = new Schema(
     brand: { type: Schema.Types.ObjectId, ref: "Brand", required: true, index: true },
 
     sourceImages: [{ type: Schema.Types.ObjectId, ref: "MediaAsset" }],
+    referenceImages: [{ type: Schema.Types.ObjectId, ref: "MediaAsset" }],
+    referenceVideo: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
     productName: { type: String, trim: true },
     productUrl: { type: String, trim: true },
+    productImageUrl: { type: String, trim: true },
     price: { type: String, trim: true },
     notes: { type: String, trim: true },
     avatar: { type: Schema.Types.ObjectId, ref: "Avatar" },
     language: { type: String, default: "en" },
     tone: { type: String, trim: true },
+    outputMode: {
+      type: String,
+      enum: ["all", "image", "video"],
+      default: "all",
+      index: true,
+    },
+
+    imageCount: { type: Number, default: 1, min: 1, max: 6 },
+    imageQuality: { type: String, enum: ["standard", "high"], default: "high" },
+    imageAspect: { type: String, enum: ["1:1", "4:5", "9:16"], default: "4:5" },
+
+    videoCount: { type: Number, default: 1, min: 1, max: 3 },
     videoSeconds: { type: Number, default: 30 },
+    videoAspect: { type: String, enum: ["9:16", "1:1", "16:9"], default: "9:16" },
     wantVideo: { type: Boolean, default: true },
 
     accountIds: { type: [String], default: [] },
@@ -134,6 +182,8 @@ const ContentJobSchema = new Schema(
     steps: { type: [StepSchema], default: [] },
 
     postImage: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
+    postImages: [{ type: Schema.Types.ObjectId, ref: "MediaAsset" }],
+    reelVideos: [{ type: Schema.Types.ObjectId, ref: "MediaAsset" }],
     reelVideo: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
     reelThumbnail: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
     reelDuration: { type: Number },

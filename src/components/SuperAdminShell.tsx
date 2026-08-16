@@ -31,6 +31,7 @@ import HistoryIcon from "@mui/icons-material/HistoryOutlined";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import ShieldIcon from "@mui/icons-material/ShieldOutlined";
 import { useColorMode } from "@/theme/ThemeRegistry";
+import ConfirmProvider from "./ConfirmProvider";
 
 const DRAWER_WIDTH = 248;
 
@@ -225,7 +226,7 @@ export default function SuperAdminShell({
       >
         <Toolbar />
         <Stack sx={{ p: { xs: 2, md: 3 } }} spacing={3}>
-          {children}
+          <ConfirmProvider>{children}</ConfirmProvider>
         </Stack>
       </Box>
     </Box>

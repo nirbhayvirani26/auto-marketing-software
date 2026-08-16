@@ -31,6 +31,7 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 
 import PageHeader from "@/components/PageHeader";
 import { apiFetch } from "@/lib/client";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Avatar = {
   _id: string;
@@ -56,6 +57,7 @@ type GeneratedView = { key: string; label: string; purpose?: string; url: string
 type Uploaded = { id: string; previewUrl: string; filename: string };
 
 export default function AvatarsPage() {
+  const confirm = useConfirm();
   const [avatars, setAvatars] = React.useState<Avatar[]>([]);
 
   // --- generated views ---
@@ -170,7 +172,15 @@ export default function AvatarsPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this avatar?")) return;
+    if (
+      !(await confirm({
+        title: "Delete this avatar?",
+        message:
+          "Its reference photos and generated views go with it. Reels already made are unaffected.",
+      }))
+    ) {
+      return;
+    }
     try {
       await apiFetch(`/api/avatars?id=${id}`, { method: "DELETE" });
       load();

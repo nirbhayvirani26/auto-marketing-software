@@ -40,6 +40,7 @@ import FacebookIcon from "@mui/icons-material/Facebook";
 import InstagramIcon from "@mui/icons-material/Instagram";
 import PageHeader from "@/components/PageHeader";
 import { apiFetch } from "@/lib/client";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Product = {
   _id: string;
@@ -75,6 +76,7 @@ type CampaignResult = {
 };
 
 export default function ProductsPage() {
+  const confirm = useConfirm();
   const [products, setProducts] = React.useState<Product[]>([]);
   const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [error, setError] = React.useState<string | null>(null);
@@ -160,7 +162,14 @@ export default function ProductsPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this product?")) return;
+    if (
+      !(await confirm({
+        title: "Delete this product?",
+        message: "Posts already created from it are kept.",
+      }))
+    ) {
+      return;
+    }
     try {
       await apiFetch(`/api/products?id=${id}`, { method: "DELETE" });
       load();

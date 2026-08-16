@@ -24,6 +24,17 @@ export type VideoBeat = {
   prompt: string;
   /** Text burned over this beat. Kept short or left empty. */
   onScreenText: string;
+  /**
+   * What the still behind this beat should show.
+   *
+   * With a brand model in the reel, each clip starts from its own generated
+   * still — her holding the box, wearing the piece, turning to the mirror. The
+   * still is built from her reference photos and the real product, so both
+   * stay identical from shot to shot; Veo then only has to add the movement.
+   */
+  keyframePrompt: string;
+  /** What she says in this beat, when the reel has a presenter. */
+  spokenLine: string;
 };
 
 export type ContentScript = {
@@ -76,7 +87,22 @@ const SCHEMA = {
         properties: {
           purpose: {
             type: "string",
-            enum: ["hook", "reveal", "detail", "lifestyle", "benefit", "cta"],
+            enum: [
+              "hook", "unbox", "first-look", "try-on", "wearing",
+              "detail", "verdict", "lifestyle", "benefit", "cta",
+            ],
+          },
+          keyframePrompt: {
+            type: "string",
+            description:
+              "What the opening frame of this clip SHOWS, as a photograph. Describe the person's pose, where the product is (in her hands, on her ear, held to camera), the setting and the lighting. " +
+              "Never describe her face or the product's own appearance — both come from reference photographs and must not be changed. " +
+              "Empty string when no person appears in the reel.",
+          },
+          spokenLine: {
+            type: "string",
+            description:
+              "One natural sentence she says to camera in this beat, under 16 words. Sounds like a real person talking, not an advert. Empty string for a silent beat or when there is no presenter.",
           },
           prompt: {
             type: "string",
@@ -90,6 +116,9 @@ const SCHEMA = {
             description: "Up to 6 words burned over this beat, or an empty string for a clean shot.",
           },
         },
+        // keyframePrompt and spokenLine are deliberately NOT required: a reel
+        // without a presenter has neither, and demanding them makes the model
+        // fail the whole structured response rather than leave them blank.
         required: ["purpose", "prompt", "onScreenText"],
       },
     },
@@ -103,7 +132,13 @@ type ScriptResponse = {
   coverText: string;
   storyText: string;
   musicMood: string;
-  beats: Array<{ purpose: string; prompt: string; onScreenText: string }>;
+  beats: Array<{
+    purpose: string;
+    prompt: string;
+    onScreenText: string;
+    keyframePrompt?: string;
+    spokenLine?: string;
+  }>;
 };
 
 export type ScriptOptions = {
@@ -119,6 +154,20 @@ export type ScriptOptions = {
   /** How long each clip runs, so pacing advice is accurate. */
   clipSeconds: number;
   avatarDescription?: string;
+  /**
+   * The pacing and shot language of a reel the seller likes. Only the STYLE
+   * is copied — never its words, its product or its claims.
+   */
+  referenceStyle?: {
+    sceneCount: number;
+    averageSceneDuration: number;
+    pacing: string;
+    shotTypes: string[];
+    textStyle: string;
+    hookStyle: string;
+    mood: string;
+    summary: string;
+  };
 };
 
 export async function writeContentScript(
@@ -132,6 +181,8 @@ export async function writeContentScript(
         "a visual change every few seconds keeps people watching, and the last beat decides whether it is saved or shared.",
         "You never invent prices, discounts, materials, certifications or claims you were not given.",
         "You never describe the product's own appearance in an image or video prompt — the product comes from the seller's real photograph and must never be redesigned.",
+        "When a presenter is involved you never describe her face either; she comes from real photographs too.",
+        "Creator-style reels outperform commercials, so when there is a presenter you write what a real person would actually say and do, not advertising copy.",
         "Return only the structured output requested.",
       ].join(" "),
       prompt: buildPrompt(options),
@@ -190,17 +241,108 @@ function buildPrompt(options: ScriptOptions): string {
       ? `TRENDING TODAY (use only if it honestly fits): ${options.trends.risingTopics.join(", ")}`
       : "",
     "",
-    "Rules for the beats:",
-    "- Beat 1 must be the hook. It has to stop the scroll on its own.",
-    "- The last beat must be the call to action.",
-    "- Each prompt describes MOVEMENT and CAMERA only, never the product's appearance.",
-    "- On-screen text is at most 6 words, and most beats are stronger with none at all.",
+    options.referenceStyle ? referenceDirection(options.referenceStyle) : "",
+    options.avatarDescription ? ugcDirection(options) : productOnlyDirection(),
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-const PURPOSES = ["hook", "reveal", "detail", "lifestyle", "benefit", "cta"];
+/**
+ * Direction taken from a reel the seller pointed at.
+ *
+ * Only the craft transfers: how fast it cuts, what kinds of shot it uses, how
+ * it opens. Copying the words or the claims of somebody else's advert would
+ * be both useless and dishonest, so the model is told so explicitly.
+ */
+function referenceDirection(style: NonNullable<ScriptOptions["referenceStyle"]>): string {
+  return [
+    "MATCH THE STYLE OF A REEL THE SELLER LIKES:",
+    `- Pacing: ${style.pacing} — roughly ${style.averageSceneDuration.toFixed(1)}s per shot, about ${style.sceneCount} shots.`,
+    style.shotTypes.length ? `- Shot types it uses: ${style.shotTypes.join(", ")}` : "",
+    style.hookStyle ? `- How it opens: ${style.hookStyle}` : "",
+    style.textStyle ? `- On-screen text style: ${style.textStyle}` : "",
+    style.mood ? `- Mood: ${style.mood}` : "",
+    style.summary ? `- In short: ${style.summary}` : "",
+    "Copy the RHYTHM and the SHOT LANGUAGE only. Never copy its words, its product, its offers or its claims.",
+    "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** Direction for a reel with no presenter — the product carries it. */
+function productOnlyDirection(): string {
+  return [
+    "Rules for the beats:",
+    "- Beat 1 must be the hook. It has to stop the scroll on its own.",
+    "- The last beat must be the call to action.",
+    "- Each prompt describes MOVEMENT and CAMERA only, never the product's appearance.",
+    "- On-screen text is at most 6 words, and most beats are stronger with none at all.",
+    "- Leave keyframePrompt and spokenLine empty; there is no person in this reel.",
+  ].join("\n");
+}
+
+/**
+ * Direction for a reel fronted by the brand's model.
+ *
+ * This is the format that actually sells on Instagram, and it is not an
+ * advert — it is one person showing another person a thing they bought. The
+ * arc is always the same because it is the arc of a real experience: it
+ * arrives, you open it, you put it on, you look, you say what you think.
+ *
+ * Asking for that arc explicitly matters. Left to itself the model writes a
+ * commercial — beautiful, generic, and scrolled past.
+ */
+function ugcDirection(options: ScriptOptions): string {
+  const beats = options.beatCount;
+
+  const arc =
+    beats <= 2
+      ? ["1. try-on — she puts it on and reacts", "2. verdict — what she thinks, and the call to action"]
+      : beats === 3
+        ? [
+            "1. hook / unbox — the package or the first glimpse, with a line that stops the scroll",
+            "2. try-on — she actually puts it on and looks",
+            "3. verdict — honest reaction to camera, then the call to action",
+          ]
+        : beats === 4
+          ? [
+              "1. hook / unbox — opening it, first reaction",
+              "2. first-look — holding it up to camera, close",
+              "3. try-on / wearing — she puts it on and turns to see it",
+              "4. verdict — what she honestly thinks, then the call to action",
+            ]
+          : [
+              "1. hook — she is holding the unopened package, one line that stops the scroll",
+              "2. unbox — opening it, genuine first reaction",
+              "3. first-look — holding it up close to camera",
+              "4. try-on / wearing — putting it on, turning to a mirror",
+              "5. verdict — honest reaction to camera, then the call to action",
+            ];
+
+  return [
+    "THIS REEL HAS A PRESENTER — the brand's own model, described above.",
+    "Write it as a real creator review, not a commercial. She bought this, she is showing a friend.",
+    "",
+    `Follow this arc across the ${beats} beats:`,
+    ...arc,
+    "",
+    "For every beat:",
+    "- keyframePrompt: what the opening frame SHOWS — her pose, where the product is (in her hands, being opened, on her ear or wrist, held to camera), the room, the light. Never describe her face or the product's appearance; both come from real photographs.",
+    "- spokenLine: what she says, in her own words. Natural, under 16 words, the way someone actually talks. Never ad copy.",
+    "- prompt: only the MOVEMENT — what she does and how the camera follows.",
+    "- onScreenText: usually empty. Her words carry it.",
+    "",
+    "Make it honest. A small real reservation ('I was worried it would feel heavy — it doesn't') sells far harder than praise.",
+    "Never claim anything you were not told about the product.",
+  ].join("\n");
+}
+
+const PURPOSES = [
+  "hook", "unbox", "first-look", "try-on", "wearing",
+  "detail", "verdict", "lifestyle", "benefit", "cta",
+];
 
 function normalise(
   raw: ScriptResponse,
@@ -218,6 +360,8 @@ function normalise(
         .split(/\s+/)
         .slice(0, 6)
         .join(" "),
+      keyframePrompt: String(beat.keyframePrompt ?? "").trim().slice(0, 700),
+      spokenLine: String(beat.spokenLine ?? "").trim().slice(0, 200),
     }))
     .filter((beat) => beat.prompt.length > 0);
 
@@ -272,6 +416,8 @@ function templateBeats(options: ScriptOptions): VideoBeat[] {
       prompt:
         "Slow push in towards the product from slightly above, soft light sweeping across it as it comes into focus.",
       onScreenText: label.split(/\s+/).slice(0, 4).join(" "),
+      keyframePrompt: "",
+      spokenLine: "",
     },
     {
       index: 1,
@@ -279,6 +425,8 @@ function templateBeats(options: ScriptOptions): VideoBeat[] {
       prompt:
         "The product rotates slowly on its surface, the camera holding steady as light travels across the detail.",
       onScreenText: "",
+      keyframePrompt: "",
+      spokenLine: "",
     },
     {
       index: 2,
@@ -286,6 +434,8 @@ function templateBeats(options: ScriptOptions): VideoBeat[] {
       prompt:
         "Very close macro pass across the surface of the product, shallow focus, light catching the texture.",
       onScreenText: "",
+      keyframePrompt: "",
+      spokenLine: "",
     },
     {
       index: 3,
@@ -293,6 +443,8 @@ function templateBeats(options: ScriptOptions): VideoBeat[] {
       prompt:
         "Slow pull back to a clean hero framing of the product, the shot settling and holding still.",
       onScreenText: "Link in bio",
+      keyframePrompt: "",
+      spokenLine: "",
     },
   ];
 }
@@ -314,6 +466,8 @@ function templateScript(options: ScriptOptions): ContentScript {
           purpose: beat.purpose,
           prompt: beat.prompt,
           onScreenText: beat.onScreenText,
+          keyframePrompt: beat.keyframePrompt,
+          spokenLine: beat.spokenLine,
         };
       }),
     },

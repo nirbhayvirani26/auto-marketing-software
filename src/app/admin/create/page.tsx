@@ -35,6 +35,11 @@ import StorefrontIcon from "@mui/icons-material/StorefrontOutlined";
 
 import PageHeader from "@/components/PageHeader";
 import ContentJobPanel, { type ContentJob } from "@/components/ContentJobPanel";
+import ReferencePicker, { type MediaItem } from "@/components/ReferencePicker";
+import OutputOptions, {
+  DEFAULT_OUTPUT,
+  type OutputSettings,
+} from "@/components/OutputOptions";
 import { apiFetch } from "@/lib/client";
 
 /* ------------------------------------------------------------------ *
@@ -185,9 +190,13 @@ export default function CreatePage() {
   const [busy, setBusy] = React.useState(false);
   const [jobId, setJobId] = React.useState<string | null>(null);
 
-  // The reel. Veo renders 8-second clips, so 32s is four of them.
-  const [wantVideo, setWantVideo] = React.useState(true);
-  const [videoSeconds, setVideoSeconds] = React.useState(32);
+  // References — shared by both tabs. Images steer the look; a reel supplies
+  // the pacing and shot language to match.
+  const [refImages, setRefImages] = React.useState<MediaItem[]>([]);
+  const [refVideo, setRefVideo] = React.useState<MediaItem[]>([]);
+
+  // What this run produces, and the settings for whichever mode is chosen.
+  const [output, setOutput] = React.useState<OutputSettings>(DEFAULT_OUTPUT);
 
   // --- shared destination state ---
   const [selectedAccounts, setSelectedAccounts] = React.useState<string[]>([]);
@@ -262,8 +271,15 @@ export default function CreatePage() {
           accountIds: selectedAccounts,
           platforms,
           avatarId: avatarId || undefined,
-          wantVideo,
-          videoSeconds,
+          referenceImageIds: refImages.map((item) => item.id),
+          referenceVideoId: refVideo[0]?.id,
+          outputMode: output.mode,
+          imageCount: output.imageCount,
+          imageQuality: output.imageQuality,
+          imageAspect: output.imageAspect,
+          videoCount: output.videoCount,
+          videoSeconds: output.videoSeconds,
+          videoAspect: output.videoAspect,
           ...payload,
         },
       });
@@ -430,37 +446,33 @@ export default function CreatePage() {
                 fullWidth
               />
 
-              <Box sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 2 }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={wantVideo}
-                      onChange={(event) => setWantVideo(event.target.checked)}
-                    />
-                  }
-                  label="Also build a reel"
-                />
-                <Typography variant="caption" color="text.secondary" display="block">
-                  Veo renders 8-second clips, so the reel is built from several,
-                  each with its own prompt, then joined with music. This is the
-                  slow part — around a minute per clip.
+              <OutputOptions value={output} onChange={setOutput} />
+
+              <Divider textAlign="left">
+                <Typography variant="caption" color="text.secondary">
+                  References — teach it the look you want
                 </Typography>
-                {wantVideo && (
-                  <TextField
-                    select
-                    label="Reel length"
-                    value={videoSeconds}
-                    onChange={(event) => setVideoSeconds(Number(event.target.value))}
-                    size="small"
-                    sx={{ mt: 1.5, minWidth: 220 }}
-                  >
-                    <MenuItem value={16}>About 16 seconds — 2 clips</MenuItem>
-                    <MenuItem value={24}>About 24 seconds — 3 clips</MenuItem>
-                    <MenuItem value={32}>About 32 seconds — 4 clips</MenuItem>
-                    <MenuItem value={40}>About 40 seconds — 5 clips</MenuItem>
-                  </TextField>
-                )}
-              </Box>
+              </Divider>
+
+              <ReferencePicker
+                label="Reference images"
+                hint="Photos that show the styling, mood or framing you want. Your product stays exactly as it is — these only steer how the shot feels."
+                kind="image"
+                roles="product,generated,reference,keyframe"
+                multiple
+                value={refImages}
+                onChange={setRefImages}
+              />
+
+              <ReferencePicker
+                label="Reference reel"
+                hint="A reel whose style you like. Its pacing, shot types and opening are matched — never its words, its product or its claims."
+                kind="video"
+                roles="reference,reel"
+                multiple={false}
+                value={refVideo}
+                onChange={setRefVideo}
+              />
 
               <AvatarPicker avatars={avatars} value={avatarId} onChange={setAvatarId} />
 
@@ -480,14 +492,20 @@ export default function CreatePage() {
                 onClick={() =>
                   create({
                     imageAssetIds: uploads.map((file) => file.id),
-                    name,
+                    productName: name,
                     notes,
                     price,
                     productUrl,
                   })
                 }
               >
-                {busy ? "Starting…" : wantVideo ? "Generate post and reel" : "Generate marketing post"}
+                {busy
+                  ? "Starting…"
+                  : output.mode === "image"
+                    ? `Generate ${output.imageCount} image${output.imageCount === 1 ? "" : "s"}`
+                    : output.mode === "video"
+                      ? "Generate reel"
+                      : "Generate post and reel"}
               </Button>
             </Stack>
           )}
@@ -610,37 +628,33 @@ export default function CreatePage() {
                 />
               </Stack>
 
-              <Box sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 2 }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={wantVideo}
-                      onChange={(event) => setWantVideo(event.target.checked)}
-                    />
-                  }
-                  label="Also build a reel"
-                />
-                <Typography variant="caption" color="text.secondary" display="block">
-                  Veo renders 8-second clips, so the reel is built from several,
-                  each with its own prompt, then joined with music. This is the
-                  slow part — around a minute per clip.
+              <OutputOptions value={output} onChange={setOutput} />
+
+              <Divider textAlign="left">
+                <Typography variant="caption" color="text.secondary">
+                  References — teach it the look you want
                 </Typography>
-                {wantVideo && (
-                  <TextField
-                    select
-                    label="Reel length"
-                    value={videoSeconds}
-                    onChange={(event) => setVideoSeconds(Number(event.target.value))}
-                    size="small"
-                    sx={{ mt: 1.5, minWidth: 220 }}
-                  >
-                    <MenuItem value={16}>About 16 seconds — 2 clips</MenuItem>
-                    <MenuItem value={24}>About 24 seconds — 3 clips</MenuItem>
-                    <MenuItem value={32}>About 32 seconds — 4 clips</MenuItem>
-                    <MenuItem value={40}>About 40 seconds — 5 clips</MenuItem>
-                  </TextField>
-                )}
-              </Box>
+              </Divider>
+
+              <ReferencePicker
+                label="Reference images"
+                hint="Photos that show the styling, mood or framing you want. Your product stays exactly as it is — these only steer how the shot feels."
+                kind="image"
+                roles="product,generated,reference,keyframe"
+                multiple
+                value={refImages}
+                onChange={setRefImages}
+              />
+
+              <ReferencePicker
+                label="Reference reel"
+                hint="A reel whose style you like. Its pacing, shot types and opening are matched — never its words, its product or its claims."
+                kind="video"
+                roles="reference,reel"
+                multiple={false}
+                value={refVideo}
+                onChange={setRefVideo}
+              />
 
               <AvatarPicker avatars={avatars} value={avatarId} onChange={setAvatarId} />
 
@@ -660,12 +674,19 @@ export default function CreatePage() {
                 onClick={() =>
                   create({
                     productUrl: chosen?.url ?? manualUrl,
-                    name: chosen?.title ?? manualName,
+                    productName: chosen?.title ?? manualName,
+                    productImageUrl: chosen?.imageUrl,
                     price: chosen?.price,
                   })
                 }
               >
-                {busy ? "Starting…" : wantVideo ? "Generate post and reel" : "Generate marketing post"}
+                {busy
+                  ? "Starting…"
+                  : output.mode === "image"
+                    ? `Generate ${output.imageCount} image${output.imageCount === 1 ? "" : "s"}`
+                    : output.mode === "video"
+                      ? "Generate reel"
+                      : "Generate post and reel"}
               </Button>
             </Stack>
           )}

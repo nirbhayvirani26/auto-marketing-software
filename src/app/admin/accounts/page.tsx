@@ -40,6 +40,7 @@ import InstagramIcon from "@mui/icons-material/Instagram";
 import PageHeader from "@/components/PageHeader";
 import StatusChip from "@/components/StatusChip";
 import { apiFetch } from "@/lib/client";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Account = {
   _id: string;
@@ -71,6 +72,7 @@ const EMPTY = {
 };
 
 function AccountsInner() {
+  const confirm = useConfirm();
   const router = useRouter();
   const params = useSearchParams();
 
@@ -153,7 +155,16 @@ function AccountsInner() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Disconnect this account?")) return;
+    if (
+      !(await confirm({
+        title: "Disconnect this account?",
+        message:
+          "Scheduled posts pointing at it will stop publishing. You can reconnect it at any time.",
+        confirmLabel: "Disconnect",
+      }))
+    ) {
+      return;
+    }
     try {
       await apiFetch(`/api/accounts/${id}`, { method: "DELETE" });
       load();

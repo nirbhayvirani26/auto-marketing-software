@@ -1,5 +1,6 @@
 import { fail, handle, ok, requireBrand } from "@/lib/api";
 import { ContentJob } from "@/models/ContentJob";
+import { failStuckContentJobs } from "@/lib/content/runner";
 import { MediaAsset } from "@/models/MediaAsset";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,10 @@ const WEIGHT: Record<string, number> = {
 export const GET = handle(async (_request, ctx) => {
   const auth = await requireBrand();
   if ("response" in auth) return auth.response;
+
+  // A job orphaned by a server restart would otherwise poll forever at
+  // whatever percentage it died on. Sweep those before answering.
+  await failStuckContentJobs();
 
   const { id } = await ctx.params;
   const job = await ContentJob.findOne({ _id: id, brand: auth.brandId }).lean();

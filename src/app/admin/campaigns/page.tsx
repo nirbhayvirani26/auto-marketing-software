@@ -26,6 +26,7 @@ import DeleteIcon from "@mui/icons-material/DeleteOutline";
 import PageHeader from "@/components/PageHeader";
 import StatusChip from "@/components/StatusChip";
 import { apiFetch } from "@/lib/client";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Account = { _id: string; displayName: string; platform: string };
 type Campaign = {
@@ -52,6 +53,7 @@ const EMPTY = {
 };
 
 export default function CampaignsPage() {
+  const confirm = useConfirm();
   const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
   const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [open, setOpen] = React.useState(false);
@@ -99,7 +101,14 @@ export default function CampaignsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this campaign?")) return;
+    if (
+      !(await confirm({
+        title: "Delete this campaign?",
+        message: "Posts created under it are kept, but lose their campaign context.",
+      }))
+    ) {
+      return;
+    }
     try {
       await apiFetch(`/api/campaigns/${id}`, { method: "DELETE" });
       load();

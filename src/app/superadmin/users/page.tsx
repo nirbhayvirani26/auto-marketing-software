@@ -68,7 +68,7 @@ export default function SuperAdminUsers() {
   }
 
   async function resetPassword(user: User) {
-    const newPassword = prompt(`${user.email} — navo password (min 8 chars):`);
+    const newPassword = prompt(`New password for ${user.email} (at least 8 characters):`);
     if (!newPassword) return;
     if (newPassword.length < 8) {
       setError("The password must be at least 8 characters");

@@ -30,6 +30,7 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrowOutlined";
 import DeleteIcon from "@mui/icons-material/DeleteOutline";
 import PageHeader from "@/components/PageHeader";
 import { apiFetch } from "@/lib/client";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Account = { _id: string; displayName: string; platform: string };
 type Campaign = { _id: string; name: string };
@@ -75,6 +76,7 @@ const EMPTY = {
 };
 
 export default function AutomationsPage() {
+  const confirm = useConfirm();
   const [automations, setAutomations] = React.useState<Automation[]>([]);
   const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
@@ -158,7 +160,14 @@ export default function AutomationsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this automation?")) return;
+    if (
+      !(await confirm({
+        title: "Delete this automation?",
+        message: "It will stop running. Posts it has already created are kept.",
+      }))
+    ) {
+      return;
+    }
     try {
       await apiFetch(`/api/automations/${id}`, { method: "DELETE" });
       load();

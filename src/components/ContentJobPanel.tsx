@@ -208,7 +208,14 @@ function StepOutput({ step }: { step: ContentStep }) {
             <Field label={`Shot list — one prompt per clip (${output.beats.length})`}>
               <Stack spacing={1}>
                 {output.beats.map(
-                  (beat: { index: number; purpose: string; prompt: string; onScreenText: string }) => (
+                  (beat: {
+                    index: number;
+                    purpose: string;
+                    prompt: string;
+                    onScreenText: string;
+                    keyframePrompt?: string;
+                    spokenLine?: string;
+                  }) => (
                     <Box
                       key={beat.index}
                       sx={{ p: 1.25, bgcolor: "action.hover", borderRadius: 1.5 }}
@@ -222,6 +229,21 @@ function StepOutput({ step }: { step: ContentStep }) {
                           </Typography>
                         )}
                       </Stack>
+                      {beat.spokenLine && (
+                        <Typography variant="body2" sx={{ mb: 0.5, fontStyle: "italic" }}>
+                          &ldquo;{beat.spokenLine}&rdquo;
+                        </Typography>
+                      )}
+                      {beat.keyframePrompt && (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          display="block"
+                          sx={{ mb: 0.5 }}
+                        >
+                          Shot: {beat.keyframePrompt}
+                        </Typography>
+                      )}
                       <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: 12 }}>
                         {beat.prompt}
                       </Typography>

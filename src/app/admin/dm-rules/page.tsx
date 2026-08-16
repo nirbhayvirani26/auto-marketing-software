@@ -44,6 +44,7 @@ import FacebookIcon from "@mui/icons-material/Facebook";
 import InstagramIcon from "@mui/icons-material/Instagram";
 import PageHeader from "@/components/PageHeader";
 import { apiFetch } from "@/lib/client";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Account = { _id: string; displayName: string; platform: string };
 type Rule = {
@@ -95,6 +96,7 @@ const EMPTY = {
 };
 
 export default function DmRulesPage() {
+  const confirm = useConfirm();
   const [rules, setRules] = React.useState<Rule[]>([]);
   const [events, setEvents] = React.useState<CommentEvent[]>([]);
   const [accounts, setAccounts] = React.useState<Account[]>([]);
@@ -171,7 +173,14 @@ export default function DmRulesPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this rule?")) return;
+    if (
+      !(await confirm({
+        title: "Delete this rule?",
+        message: "Comments matching it will no longer get a reply or a direct message.",
+      }))
+    ) {
+      return;
+    }
     try {
       await apiFetch(`/api/comment-rules/${id}`, { method: "DELETE" });
       load();

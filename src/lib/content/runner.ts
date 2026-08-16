@@ -41,6 +41,8 @@ import {
 } from "@/lib/ai/vision";
 import { buildTrendPack } from "@/lib/trends/keywords";
 import { writeContentScript } from "./script";
+import { fetchProductImages } from "./product-images";
+import { analyzeReference } from "@/lib/reels/reference";
 import { generateSocialCopy } from "@/lib/seo/copy";
 import { composeImage, generateImage } from "@/lib/media/image-gen";
 import { CLIP_SECONDS, clipsForDuration, generateVeoClip } from "@/lib/video/veo";
@@ -74,6 +76,91 @@ export function contentRunnerStatus() {
   return { running: running.size, maxConcurrent: maxConcurrent() };
 }
 
+/* ------------------------------------------------------------------ *
+ *  Guards against a job that never finishes
+ * ------------------------------------------------------------------ */
+
+/**
+ * A single step may not run longer than this.
+ *
+ * Each provider already has its own timeout, but a chain of four providers
+ * each retried once can still add up to a quarter of an hour, and the person
+ * watching the progress bar has no idea whether anything is happening. A hard
+ * cap turns "stuck forever" into "this step failed, here is why".
+ */
+const STEP_LIMITS: Partial<Record<string, number>> = {
+  understand: 4 * 60_000,
+  trends: 2 * 60_000,
+  script: 3 * 60_000,
+  image: 4 * 60_000,
+  copy: 4 * 60_000,
+  assemble: 10 * 60_000,
+};
+
+/**
+ * After this long with no step update at all, a job is presumed dead.
+ *
+ * Every step either finishes inside its own cap or writes a progress note as
+ * it goes — the video step updates on each clip — so ten minutes of complete
+ * silence means the run is gone, not slow.
+ */
+const STUCK_AFTER_MS = 10 * 60_000;
+
+class StepTimeout extends Error {
+  constructor(label: string, ms: number) {
+    super(`${label} gave up after ${Math.round(ms / 1000)}s`);
+    this.name = "StepTimeout";
+  }
+}
+
+/** Runs a step, failing loudly rather than hanging. */
+function withLimit<T>(key: string, label: string, fn: () => Promise<T>): Promise<T> {
+  const limit = STEP_LIMITS[key];
+  if (!limit) return fn();
+
+  return Promise.race([
+    fn(),
+    new Promise<never>((_resolve, reject) =>
+      setTimeout(() => reject(new StepTimeout(label, limit)), limit).unref?.(),
+    ),
+  ]);
+}
+
+/**
+ * Marks abandoned jobs as failed.
+ *
+ * A job dies without warning if the process restarts mid-run — which in
+ * development happens on every code change. Without this, the panel sits at
+ * 21% forever and there is no way to tell a slow render from a dead one.
+ */
+export async function failStuckContentJobs(): Promise<number> {
+  await connectDB();
+
+  const cutoff = new Date(Date.now() - STUCK_AFTER_MS);
+  const stale = await ContentJob.find({
+    status: { $in: ["queued", "running"] },
+    updatedAt: { $lt: cutoff },
+  });
+
+  for (const job of stale) {
+    if (running.has(String(job._id))) continue; // genuinely still working
+
+    for (const step of job.steps) {
+      if (step.status === "running" || step.status === "pending") {
+        step.status = "failed";
+        step.error = "The run was interrupted";
+      }
+    }
+    job.status = "failed";
+    job.error =
+      "This run was interrupted before it finished — most likely the server restarted. Start it again.";
+    job.finishedAt = new Date();
+    await job.save();
+  }
+
+  return stale.length;
+}
+
 /* ------------------------------------------------------------------ */
 
 async function timed<T>(fn: () => Promise<T>): Promise<{ value: T; ms: number }> {
@@ -87,15 +174,23 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ value: T; ms: number }>
 export async function startContentJob(input: {
   brandId: string;
   imageAssetIds: string[];
+  referenceImageIds?: string[];
+  referenceVideoId?: string;
   productName?: string;
   productUrl?: string;
+  productImageUrl?: string;
   price?: string;
   notes?: string;
   avatarId?: string;
   language?: string;
   tone?: string;
+  outputMode?: "all" | "image" | "video";
+  imageCount?: number;
+  imageQuality?: "standard" | "high";
+  imageAspect?: "1:1" | "4:5" | "9:16";
+  videoCount?: number;
   videoSeconds?: number;
-  wantVideo?: boolean;
+  videoAspect?: "9:16" | "1:1" | "16:9";
   accountIds?: string[];
   platforms?: string[];
   createdBy?: string;
@@ -105,23 +200,36 @@ export async function startContentJob(input: {
   const job = await ContentJob.create({
     brand: input.brandId,
     sourceImages: input.imageAssetIds,
+    referenceImages: input.referenceImageIds ?? [],
+    referenceVideo: input.referenceVideoId,
     productName: input.productName,
     productUrl: input.productUrl,
+    productImageUrl: input.productImageUrl,
     price: input.price,
     notes: input.notes,
     avatar: input.avatarId,
     language: input.language ?? "en",
     tone: input.tone,
+    outputMode: input.outputMode ?? "all",
+    imageCount: input.imageCount ?? 1,
+    imageQuality: input.imageQuality ?? "high",
+    imageAspect: input.imageAspect ?? "4:5",
+    videoCount: input.videoCount ?? 1,
     videoSeconds: input.videoSeconds ?? 30,
-    wantVideo: input.wantVideo !== false,
+    videoAspect: input.videoAspect ?? "9:16",
+    // Derived once here so every later check is a single boolean.
+    wantVideo: (input.outputMode ?? "all") !== "image",
     accountIds: input.accountIds ?? [],
     platforms: input.platforms ?? [],
     status: "queued",
     createdBy: input.createdBy,
-    steps: CONTENT_STEPS.filter(
-      (step) => step.key !== "video" || input.wantVideo !== false,
-    )
-      .filter((step) => step.key !== "assemble" || input.wantVideo !== false)
+    steps: CONTENT_STEPS.filter((step) => {
+      const mode = input.outputMode ?? "all";
+      if (mode === "image" && (step.key === "video" || step.key === "assemble")) {
+        return false;
+      }
+      return true;
+    })
       .map((step) => ({ ...step, status: "pending" as const })),
   });
 
@@ -169,6 +277,51 @@ export async function runContentJob(jobId: string): Promise<void> {
       _id: { $in: job.sourceImages },
       kind: "image",
     });
+
+    /* ---- Nothing uploaded? Fetch the product's own photographs ---- */
+    //
+    // This is the difference between an advert for YOUR product and an advert
+    // for something the model imagined. Without a real photograph to work
+    // from, image generation invents the product: wrong stone, wrong fabric,
+    // wrong colour. So a link is turned into pictures before anything else
+    // happens, and those pictures become the reference everywhere downstream.
+    if (images.length === 0 && job.productUrl?.trim()) {
+      await setContentStep(jobId, "understand", {
+        status: "running",
+        note: "Fetching your product photos from the link",
+      });
+
+      const fetched = await fetchProductImages(job.productUrl.trim(), {
+        limit: 5,
+        extraUrls: job.productImageUrl ? [job.productImageUrl] : [],
+      });
+
+      for (const photo of fetched.photos) {
+        const asset = await saveMedia({
+          data: photo.data,
+          filename: `product-${images.length + 1}.jpg`,
+          mimeType: photo.mimeType,
+          role: "product",
+          brand: String(brand._id),
+          createdBy: job.createdBy ? String(job.createdBy) : undefined,
+          provider: "product page",
+          prompt: photo.url,
+          makePublic: false,
+        });
+        images.push(asset);
+      }
+
+      if (images.length > 0) {
+        job.sourceImages = images.map((asset) => asset._id) as never;
+        await job.save();
+      } else {
+        warnings.push(
+          fetched.error
+            ? `No photos could be read from that product link (${fetched.error}). The post was written from the name alone, and the image is a fresh one rather than your product.`
+            : "No photos were found on that product link, so the generated image will not show your actual product. Upload a photo for an accurate result.",
+        );
+      }
+    }
 
     let analysis: ProductIntelligence;
     let visionProvider = "typed description";
@@ -229,7 +382,9 @@ export async function runContentJob(jobId: string): Promise<void> {
     await setContentStep(jobId, "trends", { status: "running" });
 
     const trendsRun = await timed(() =>
-      buildTrendPack({ product: analysis, brandTag: brand.name }),
+      withLimit("trends", "Finding trending keywords", () =>
+        buildTrendPack({ product: analysis, brandTag: brand.name }),
+      ),
     );
     const trends = trendsRun.value;
     job.trends = trends;
@@ -252,7 +407,32 @@ export async function runContentJob(jobId: string): Promise<void> {
 
     const beatCount = job.wantVideo ? clipsForDuration(job.videoSeconds) : 0;
 
+    /* ---- A reel to copy the style of ---- */
+    //
+    // ffmpeg measures how the reference actually cuts — shot count, average
+    // shot length, pacing — and the frames are described so the shot language
+    // carries across. Only the craft transfers; the words and claims never do.
+    let referenceStyle: Awaited<ReturnType<typeof analyzeReference>> | undefined;
+
+    if (job.referenceVideo) {
+      try {
+        await setContentStep(jobId, "script", {
+          status: "running",
+          note: "Studying the reel you picked",
+        });
+        const referenceAsset = await MediaAsset.findById(job.referenceVideo);
+        if (referenceAsset) {
+          referenceStyle = await analyzeReference(await ensureLocalPath(referenceAsset));
+        }
+      } catch (error) {
+        warnings.push(
+          `The reference reel could not be read (${(error as Error).message.slice(0, 100)}), so its style was not copied.`,
+        );
+      }
+    }
+
     const scriptRun = await timed(() =>
+      withLimit("script", "Writing the script", () =>
       writeContentScript({
         product: analysis,
         trends,
@@ -264,7 +444,9 @@ export async function runContentJob(jobId: string): Promise<void> {
         beatCount: Math.max(beatCount, 1),
         clipSeconds: CLIP_SECONDS,
         avatarDescription: avatar ? avatarPromptDescription(avatar) : undefined,
+        referenceStyle,
       }),
+      ),
     );
     const script = scriptRun.value;
     job.script = script;
@@ -295,25 +477,136 @@ export async function runContentJob(jobId: string): Promise<void> {
     let postImageAsset = images[0] ?? null;
     let postImageBuffer: Buffer | null = null;
 
+    // Every product photo we have, not just the first. More angles give the
+    // model more of the real object to hold on to. Declared out here because
+    // the video step needs them too, for the per-beat keyframes.
+    const productRefs = await Promise.all(
+      images.slice(0, 4).map(async (asset) => ({
+        data: await readFile(await ensureLocalPath(asset)),
+        mimeType: "image/jpeg",
+        role: "product" as const,
+      })),
+    );
+
+    /**
+     * Extra photographs chosen to steer the look.
+     *
+     * Tagged "style" rather than "product" on purpose — they say how the shot
+     * should feel, not what the item is. Labelling them as products would
+     * invite the model to blend two different objects into one.
+     */
+    const styleAssets = job.referenceImages?.length
+      ? await MediaAsset.find({ _id: { $in: job.referenceImages }, kind: "image" })
+      : [];
+
+    const styleRefs = await Promise.all(
+      styleAssets.slice(0, 3).map(async (asset) => ({
+        data: await readFile(await ensureLocalPath(asset)),
+        mimeType: "image/jpeg",
+        role: "style" as const,
+      })),
+    );
+
+    /**
+     * The chosen model's photographs.
+     *
+     * Generated views come first when they exist — a full-body and a face
+     * close-up pin the person down far more firmly than a single upload, which
+     * is what keeps her recognisably the same across every shot in the reel.
+     */
+    const avatarPhotoIds = [
+      ...(avatar?.generatedViews ?? [])
+        .filter((view) => ["face-focus", "full-body"].includes(view.key))
+        .map((view) => view.media),
+      avatar?.primaryPhoto,
+      ...(avatar?.referencePhotos ?? []),
+    ].filter(Boolean);
+
+    const uniqueAvatarIds = [...new Map(avatarPhotoIds.map((id) => [String(id), id])).values()];
+
+    const avatarAssets = uniqueAvatarIds.length
+      ? await MediaAsset.find({ _id: { $in: uniqueAvatarIds.slice(0, 3) } })
+      : [];
+
+    const avatarRefs = await Promise.all(
+      avatarAssets.map(async (asset) => ({
+        data: await readFile(await ensureLocalPath(asset)),
+        mimeType: "image/jpeg",
+        role: "person" as const,
+      })),
+    );
+
     try {
-      const sourceBuffer = images[0]
-        ? await readFile(await ensureLocalPath(images[0]))
-        : null;
+      /**
+       * The rules that keep it YOUR product.
+       *
+       * Without these the model treats the reference as inspiration and
+       * "improves" the item — a different stone, a different weave, a colour
+       * that photographs better. That is the single most damaging thing an
+       * advert can do, so the instruction is explicit and repeated.
+       */
+      const preserveProduct = [
+        "",
+        "ABSOLUTE REQUIREMENT — this must be the EXACT product in the reference photograph.",
+        "Reproduce it pixel-faithfully: same shape, same colour, same material, same texture,",
+        "same pattern, same stitching, same stones, same hardware, same proportions, same finish.",
+        "You are restaging and relighting a real product for an advert — you are NOT designing a new one.",
+        "Do not beautify it, do not simplify it, do not substitute a similar item, do not change the angle of the product itself.",
+        "Change only the surroundings: background, surface, props, lighting and camera framing.",
+        "No text, no logos, no watermarks anywhere in the image.",
+      ].join("\n");
+
+      const imagePrompt = `${script.imagePrompt}${preserveProduct}`;
+
+      const aspect = job.imageAspect ?? "4:5";
+      const wanted = Math.max(1, Math.min(6, job.imageCount ?? 1));
+
+      /**
+       * Ask for several images by varying the staging, not the product.
+       *
+       * Generating the identical prompt N times returns near-identical
+       * pictures, which is no use to anyone. Each pass gets a different
+       * setting and camera instead, so you end up with a usable set to choose
+       * from — while the product itself stays fixed by the reference photos.
+       */
+      const variations = [
+        "",
+        " Restage it on a different surface, with a different prop, from a slightly lower angle.",
+        " Restage it outdoors in soft natural daylight, with a simple everyday backdrop.",
+        " Restage it as a close macro detail shot, very shallow depth of field.",
+        " Restage it as a flat lay from directly above, with generous negative space.",
+        " Restage it in a warm evening light with a soft shadow falling across the frame.",
+      ];
+
+      const quality = job.imageQuality ?? "high";
+
+      const generateOne = (index: number) => {
+        const prompt = `${imagePrompt}${variations[index % variations.length]}${
+          quality === "high"
+            ? "\nUltra sharp, high resolution, magazine-quality product photography."
+            : ""
+        }`;
+
+        return productRefs.length > 0
+          ? composeImage({
+              prompt,
+              references: [...productRefs, ...avatarRefs, ...styleRefs],
+              aspectRatio: aspect,
+            })
+          : // Nothing real to work from. Said loudly in the step note rather
+            // than quietly shipping an invented product.
+            generateImage({ prompt, aspectRatio: aspect });
+      };
 
       const imageRun = await timed(() =>
-        sourceBuffer
-          ? composeImage({
-              prompt: script.imagePrompt,
-              references: [
-                { data: sourceBuffer, mimeType: "image/jpeg", role: "product" },
-                ...(avatar?.primaryPhoto
-                  ? []
-                  : ([] as { data: Buffer; mimeType: string; role: "person" }[])),
-              ],
-              aspectRatio: "4:5",
-            })
-          : generateImage({ prompt: script.imagePrompt, aspectRatio: "4:5" }),
+        withLimit("image", "Generating the post image", () => generateOne(0)),
       );
+
+      if (productRefs.length === 0) {
+        warnings.push(
+          "The image was generated from the description only, so it is not a photograph of your actual product. Upload a photo, or use a product link that has images.",
+        );
+      }
 
       postImageBuffer = imageRun.value.data.data;
       postImageAsset = await saveMedia({
@@ -324,19 +617,58 @@ export async function runContentJob(jobId: string): Promise<void> {
         brand: String(brand._id),
         createdBy: job.createdBy ? String(job.createdBy) : undefined,
         provider: imageRun.value.provider,
-        prompt: script.imagePrompt,
+        prompt: imagePrompt,
         makePublic: true,
       });
 
       job.postImage = postImageAsset._id;
+      const producedImages = [postImageAsset._id];
+
+      /* ---- The rest of the set ---- */
+      for (let index = 1; index < wanted; index += 1) {
+        await setContentStep(jobId, "image", {
+          status: "running",
+          note: `Image ${index + 1} of ${wanted}`,
+        });
+        try {
+          const extra = await withLimit("image", "Generating an image", () =>
+            generateOne(index),
+          );
+          const asset = await saveMedia({
+            data: extra.data.data,
+            filename: `post-${label.slice(0, 30)}-${index + 1}.jpg`,
+            mimeType: extra.data.mimeType,
+            role: "generated",
+            brand: String(brand._id),
+            createdBy: job.createdBy ? String(job.createdBy) : undefined,
+            provider: extra.provider,
+            prompt: imagePrompt,
+            makePublic: true,
+          });
+          producedImages.push(asset._id);
+        } catch (error) {
+          warnings.push(
+            `Image ${index + 1} could not be generated (${(error as Error).message.slice(0, 90)}).`,
+          );
+        }
+      }
+
+      job.postImages = producedImages as never;
       await job.save();
 
       await setContentStep(jobId, "image", {
         status: "done",
         ms: imageRun.ms,
         provider: imageRun.value.provider,
-        note: `${(postImageBuffer.length / 1024).toFixed(0)} KB`,
-        output: { url: `/api/media/${postImageAsset._id}`, prompt: script.imagePrompt },
+        note:
+          producedImages.length > 1
+            ? `${producedImages.length} images · ${aspect} · ${quality}`
+            : `${(postImageBuffer.length / 1024).toFixed(0)} KB · ${aspect}`,
+        output: {
+          url: `/api/media/${postImageAsset._id}`,
+          urls: producedImages.map((id) => `/api/media/${id}`),
+          prompt: script.imagePrompt,
+        },
       });
     } catch (error) {
       // Fall back to the seller's own photo — it is a real product shot, which
@@ -432,12 +764,71 @@ export async function runContentJob(jobId: string): Promise<void> {
         });
 
         try {
+          /* ---- The frame this clip starts from ---- */
+          //
+          // With a presenter, each beat gets its own still first: her holding
+          // the box, putting it on, turning to look. Both she and the product
+          // are supplied as reference photographs, so neither changes from one
+          // shot to the next — which is the whole reason the reel reads as one
+          // continuous person rather than five different people.
+          //
+          // Veo then only has to add movement to a frame that is already
+          // correct, which it does far more reliably than inventing a scene.
+          let firstFrame = postImageBuffer ?? undefined;
+
+          if (avatarRefs.length > 0 && beat.keyframePrompt) {
+            try {
+              await setContentStep(jobId, "video", {
+                status: "running",
+                note: `Clip ${beat.index + 1} of ${script.beats.length} — staging the shot`,
+              });
+
+              const keyframe = await composeImage({
+                prompt: [
+                  beat.keyframePrompt,
+                  "",
+                  "The person must be the EXACT person in the reference photographs — same face, same bone structure, same skin tone, same hair. Do not restyle or beautify her.",
+                  "The product must be the EXACT product in the reference photographs — same shape, colour, material and detail. Do not redesign it.",
+                  "Photorealistic, shot on a phone in natural light, vertical 9:16 framing.",
+                  "No text, no logos, no watermarks.",
+                ].join("\n"),
+                references: [...avatarRefs, ...productRefs],
+                aspectRatio: (job.videoAspect ?? "9:16") as "9:16" | "1:1",
+              });
+
+              firstFrame = keyframe.data.data;
+
+              await saveMedia({
+                data: keyframe.data.data,
+                filename: `keyframe-${beat.index}.jpg`,
+                mimeType: keyframe.data.mimeType,
+                role: "keyframe",
+                brand: String(brand._id),
+                provider: keyframe.provider,
+                prompt: beat.keyframePrompt,
+                makePublic: false,
+              });
+            } catch (error) {
+              // A missing keyframe is not fatal — fall back to the product
+              // shot so the beat still renders.
+              warnings.push(
+                `The staged shot for clip ${beat.index + 1} could not be made (${(error as Error).message.slice(0, 90)}).`,
+              );
+            }
+          }
+
           const clip = await generateVeoClip({
-            prompt: beat.prompt,
-            aspectRatio: "9:16",
-            // The first frame is the real product, so Veo animates it rather
-            // than inventing its own version.
-            image: postImageBuffer ?? undefined,
+            prompt: [
+              beat.prompt,
+              beat.spokenLine
+                ? `She is speaking to the camera, saying: "${beat.spokenLine}"`
+                : "",
+              "Keep the person and the product exactly as they appear in the first frame.",
+            ]
+              .filter(Boolean)
+              .join(" "),
+            aspectRatio: (job.videoAspect ?? "9:16") as "9:16" | "16:9",
+            image: firstFrame,
           });
 
           const file = path.join(workDir, `clip-${beat.index}.mp4`);
@@ -657,7 +1048,16 @@ export async function runContentJob(jobId: string): Promise<void> {
       const rows = targets.length > 0 ? targets : [null];
 
       for (const account of rows) {
-        // The image post.
+        // One post per generated image, so a set of six is six drafts to
+        // pick from rather than one plus five orphaned files.
+        const imageIds = (job.postImages?.length ? job.postImages : [postImageAsset?._id]).filter(Boolean);
+
+        for (const [imageIndex, imageId] of imageIds.entries()) {
+        const imageAsset = imageIndex === 0 ? postImageAsset : await MediaAsset.findById(imageId);
+        const thisImageUrl = imageAsset
+          ? await ensurePublicUrl(imageAsset).catch(() => imageUrl)
+          : imageUrl;
+
         const imagePost = await Post.create({
           brand: brand._id,
           account: account?._id,
@@ -665,9 +1065,9 @@ export async function runContentJob(jobId: string): Promise<void> {
           postType: "image",
           caption: platformCopy.caption,
           hashtags: platformCopy.hashtags,
-          mediaUrl: imageUrl,
-          mediaType: imageUrl ? "image" : "none",
-          mediaAsset: postImageAsset?._id,
+          mediaUrl: thisImageUrl,
+          mediaType: thisImageUrl ? "image" : "none",
+          mediaAsset: imageId,
           firstComment: platformCopy.firstComment,
           seo: platformCopy.score,
           prompt: script.concept,
@@ -677,6 +1077,7 @@ export async function runContentJob(jobId: string): Promise<void> {
           createdBy: job.createdBy,
         });
         postIds.push(String(imagePost._id));
+        }
 
         // The reel, when there is one.
         if (reelUrl) {

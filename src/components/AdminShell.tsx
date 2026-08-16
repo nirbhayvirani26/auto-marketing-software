@@ -34,6 +34,7 @@ import StorageIcon from "@mui/icons-material/StorageOutlined";
 
 import { useColorMode } from "@/theme/ThemeRegistry";
 import BrandSwitcher from "./BrandSwitcher";
+import ConfirmProvider from "./ConfirmProvider";
 import { NAV_SECTIONS, navItemForPath } from "./nav-items";
 
 const DRAWER_WIDTH = 264;
@@ -385,7 +386,7 @@ export default function AdminShell({
       >
         <Toolbar />
         <Stack sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: "auto" }} spacing={3}>
-          {children}
+          <ConfirmProvider>{children}</ConfirmProvider>
         </Stack>
       </Box>
     </Box>

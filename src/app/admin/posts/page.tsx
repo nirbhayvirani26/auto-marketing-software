@@ -45,6 +45,7 @@ import InstagramIcon from "@mui/icons-material/Instagram";
 import PageHeader from "@/components/PageHeader";
 import StatusChip from "@/components/StatusChip";
 import { apiFetch } from "@/lib/client";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Platform = "facebook" | "instagram";
 type Account = { _id: string; displayName: string; platform: Platform };
@@ -90,6 +91,7 @@ const EMPTY_FORM = {
 };
 
 export default function PostsPage() {
+  const confirm = useConfirm();
   const [posts, setPosts] = React.useState<Post[]>([]);
   const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
@@ -267,7 +269,14 @@ export default function PostsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this post?")) return;
+    if (
+      !(await confirm({
+        title: "Delete this post?",
+        message: "The draft and its caption are removed. Published posts stay live on the platform.",
+      }))
+    ) {
+      return;
+    }
     try {
       await apiFetch(`/api/posts/${id}`, { method: "DELETE" });
       load();

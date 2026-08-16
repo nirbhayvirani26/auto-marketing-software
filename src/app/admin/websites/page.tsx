@@ -31,6 +31,7 @@ import SearchIcon from "@mui/icons-material/SearchOutlined";
 
 import PageHeader from "@/components/PageHeader";
 import { apiFetch } from "@/lib/client";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Product = {
   url: string;
@@ -55,6 +56,7 @@ type Site = {
 };
 
 export default function WebsitesPage() {
+  const confirm = useConfirm();
   const [sites, setSites] = React.useState<Site[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -122,7 +124,16 @@ export default function WebsitesPage() {
   }
 
   async function disconnect(site: Site) {
-    if (!confirm(`Disconnect ${site.host}? Its product list will be removed.`)) return;
+    if (
+      !(await confirm({
+        title: `Disconnect ${site.host}?`,
+        message:
+          "Its imported product list is removed. You can connect it again and re-import at any time.",
+        confirmLabel: "Disconnect",
+      }))
+    ) {
+      return;
+    }
     await apiFetch(`/api/websites/${site.id}`, { method: "DELETE" });
     load();
   }

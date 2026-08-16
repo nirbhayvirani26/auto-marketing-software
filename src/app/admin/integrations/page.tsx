@@ -37,6 +37,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import PageHeader from "@/components/PageHeader";
 import { apiFetch } from "@/lib/client";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Token = {
   _id: string;
@@ -89,6 +90,7 @@ function Code({ children }: { children: React.ReactNode }) {
 }
 
 export default function IntegrationsPage() {
+  const confirm = useConfirm();
   const [tokens, setTokens] = React.useState<Token[]>([]);
   const [scopes, setScopes] = React.useState<string[]>([]);
   const [tokensLocked, setTokensLocked] = React.useState<string | null>(null);
@@ -136,7 +138,16 @@ export default function IntegrationsPage() {
   }
 
   async function revoke(id: string) {
-    if (!confirm("Revoke this token? Any service using it will stop working.")) return;
+    if (
+      !(await confirm({
+        title: "Revoke this token?",
+        message:
+          "Any service still using it — n8n, a script, a webhook — stops working immediately. This cannot be undone.",
+        confirmLabel: "Revoke",
+      }))
+    ) {
+      return;
+    }
     try {
       await apiFetch(`/api/tokens?id=${id}`, { method: "DELETE" });
       load();

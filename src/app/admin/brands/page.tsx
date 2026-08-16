@@ -26,6 +26,7 @@ import DeleteIcon from "@mui/icons-material/DeleteOutline";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PageHeader from "@/components/PageHeader";
 import { apiFetch } from "@/lib/client";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Brand = {
   _id: string;
@@ -62,6 +63,7 @@ const PALETTE = [
 ];
 
 export default function BrandsPage() {
+  const confirm = useConfirm();
   const [brands, setBrands] = React.useState<Brand[]>([]);
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [open, setOpen] = React.useState(false);
@@ -89,7 +91,7 @@ export default function BrandsPage() {
       await apiFetch("/api/brands", { method: "POST", json: form });
       setOpen(false);
       setForm(EMPTY);
-      setNotice(`"${form.name}" brand banyu`);
+      setNotice(`"${form.name}" was created.`);
       load();
     } catch (e) {
       setError((e as Error).message);
@@ -113,13 +115,17 @@ export default function BrandsPage() {
   }
 
   async function handleDelete(brand: Brand) {
-    const typed = prompt(
-      `Aa brand ane ena BADHA accounts, posts, campaigns, automations ane DM rules delete thai jashe.\n\nConfirm karva brand nu naam lakho:`,
-    );
-    if (typed !== brand.name) {
-      if (typed !== null) setError("The name did not match — nothing was deleted.");
-      return;
-    }
+    // Deleting a brand takes everything underneath it with it, so this one
+    // asks for the name to be typed rather than accepting a single click.
+    const confirmed = await confirm({
+      title: `Delete ${brand.name}?`,
+      message:
+        "Every account, post, campaign, automation and DM rule under this brand is deleted with it. This cannot be undone.",
+      confirmLabel: "Delete brand",
+      requireText: brand.name,
+      requireTextHint: "Type the brand name to confirm",
+    });
+    if (!confirmed) return;
     setBusy(brand._id);
     try {
       await apiFetch(
@@ -146,7 +152,7 @@ export default function BrandsPage() {
             startIcon={<AddIcon />}
             onClick={() => setOpen(true)}
           >
-            Navu brand
+            New brand
           </Button>
         }
       />
